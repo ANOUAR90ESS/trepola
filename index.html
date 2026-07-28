@@ -122,6 +122,34 @@
       });
     </script>
 
+    <!-- swg-basic.js injects a <swg-popup-background role="button"> element with
+         no accessible name (fails "ARIA commands must have an accessible name").
+         We don't control that markup, so patch it in place the moment it appears. -->
+    <script>
+      (function () {
+        function patchSwgPopupBackground(el) {
+          if (!el.hasAttribute('aria-label')) {
+            el.setAttribute('aria-label', 'Cerrar ventana emergente');
+          }
+        }
+        var existing = document.querySelector('swg-popup-background');
+        if (existing) patchSwgPopupBackground(existing);
+        new MutationObserver(function (mutations) {
+          mutations.forEach(function (mutation) {
+            mutation.addedNodes.forEach(function (node) {
+              if (node.nodeType !== 1) return;
+              if (node.tagName && node.tagName.toLowerCase() === 'swg-popup-background') {
+                patchSwgPopupBackground(node);
+              } else if (node.querySelector) {
+                var nested = node.querySelector('swg-popup-background');
+                if (nested) patchSwgPopupBackground(nested);
+              }
+            });
+          });
+        }).observe(document.documentElement, { childList: true, subtree: true });
+      })();
+    </script>
+
     <!-- Load gtag.js, adsbygoogle.js and swg-basic.js after the page finishes
          loading instead of eagerly in <head>, so they don't contend with our
          own CSS/JS for bandwidth during the initial paint on mobile. Staggered
