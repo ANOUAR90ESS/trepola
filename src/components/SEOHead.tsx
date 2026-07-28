@@ -88,7 +88,7 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
                 '@type': 'ListItem',
                 'position': 2,
                 'name': selectedArticle.category,
-                'item': `https://www.trepola.com/category/${selectedArticle.category.toLowerCase()}`,
+                'item': `https://www.trepola.com/categoria/${selectedArticle.category.toLowerCase()}`,
               },
               {
                 '@type': 'ListItem',

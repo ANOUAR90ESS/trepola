@@ -17,7 +17,16 @@ import OpenAI from 'openai';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import Parser from 'rss-parser';
 import { INITIAL_ARTICLES, INITIAL_COMMENTS } from './src/data/initialData.js';
-import { allCategoryPaths } from './src/utils/categoryRoutes.js';
+import { allCategoryPaths, pathToCategoryId } from './src/utils/categoryRoutes.js';
+
+const CATEGORY_NAMES_ES: Record<string, string> = {
+  general: 'Noticias General',
+  tech: 'Tecnología',
+  sports: 'Deportes',
+  politics: 'Política',
+  economy: 'Economía y Negocios',
+  culture: 'Cultura y Arte',
+};
 
 function serverSlugify(text: string): string {
   if (!text) return '';
@@ -1014,6 +1023,17 @@ app.get('*', async (req, res, next) => {
     html = html
       .replace(/<title>.*?<\/title>/gi, `<title>Política de Privacidad | Trepola</title>`)
       .replace(/<link rel="canonical" href=".*?"\s*\/?>/gi, `<link rel="canonical" href="${baseUrl}/privacy" />`);
+  } else {
+    // Intercept /categoria/:id
+    const categoryId = pathToCategoryId(cleanPath);
+    if (categoryId !== 'all' && cleanPath.startsWith('/categoria/')) {
+      const categoryName = CATEGORY_NAMES_ES[categoryId] || categoryId;
+      const categoryCanonical = `${baseUrl}/categoria/${categoryId}`;
+      html = html
+        .replace(/<title>.*?<\/title>/gi, `<title>${categoryName} | Trepola</title>`)
+        .replace(/<link rel="canonical" href=".*?"\s*\/?>/gi, `<link rel="canonical" href="${categoryCanonical}" />`)
+        .replace(/<meta name="description" content=".*?"\s*\/?>/gi, `<meta name="description" content="Últimas noticias de ${categoryName} en Trepola." />`);
+    }
   }
 
   // Intercept /news/:slugOrId
@@ -1084,7 +1104,7 @@ app.get('*', async (req, res, next) => {
             '@id': `${canonicalUrl}#breadcrumb`,
             'itemListElement': [
               { '@type': 'ListItem', 'position': 1, 'name': 'Inicio', 'item': baseUrl },
-              { '@type': 'ListItem', 'position': 2, 'name': article.category || 'Noticias', 'item': `${baseUrl}/category/${(article.category || 'general').toLowerCase()}` },
+              { '@type': 'ListItem', 'position': 2, 'name': article.category || 'Noticias', 'item': `${baseUrl}/categoria/${(article.category || 'general').toLowerCase()}` },
               { '@type': 'ListItem', 'position': 3, 'name': artTitle, 'item': canonicalUrl },
             ],
           },
