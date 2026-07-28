@@ -47,7 +47,7 @@ export const AdPlaceholder: React.FC<AdPlaceholderProps> = React.memo(({
 
   if (format === 'sticky-footer') {
     return (
-      <div className={`fixed bottom-0 inset-x-0 z-50 bg-slate-900 border-t border-slate-700 shadow-2xl flex items-center justify-center ${className}`} style={{ minHeight: '90px' }}>
+      <div className={`fixed bottom-0 inset-x-0 z-50 bg-slate-900 border-t border-slate-700 shadow-2xl flex items-center justify-center ${className}`} style={{ height: '90px', overflow: 'hidden' }}>
         <button
           onClick={() => setClosed(true)}
           aria-label="Cerrar anuncio"

@@ -95,8 +95,10 @@
       }
     </script>
 
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-V9DNYS0MMG"></script>
+    <!-- Google tag (gtag.js) queue stub. The real script is loaded after first
+         paint (see deferred loader below) so it doesn't compete with the
+         critical render path for bandwidth/CPU on mobile; calls made before
+         it loads are queued via dataLayer.push and replayed once it arrives. -->
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
@@ -105,11 +107,7 @@
       gtag('config', 'G-V9DNYS0MMG');
     </script>
 
-    <!-- Google AdSense Verification Script -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9054863881104831" crossorigin="anonymous"></script>
-
-    <!-- Google Subscribe with Google (SwG Basic) for Google News Publisher Center -->
-    <script async src="https://news.google.com/swg/js/v1/swg-basic.js"></script>
+    <!-- Subscribe with Google (SwG Basic) queue stub, same deferred-load reasoning. -->
     <script>
       (self.SWG_BASIC = self.SWG_BASIC || []).push((basicSubscriptions) => {
         basicSubscriptions.init({
@@ -122,6 +120,30 @@
           },
         });
       });
+    </script>
+
+    <!-- Load gtag.js, adsbygoogle.js and swg-basic.js after the page finishes
+         loading instead of eagerly in <head>, so they don't contend with our
+         own CSS/JS for bandwidth during the initial paint on mobile. -->
+    <script>
+      function loadDeferredThirdPartyScripts() {
+        [
+          'https://www.googletagmanager.com/gtag/js?id=G-V9DNYS0MMG',
+          'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9054863881104831',
+          'https://news.google.com/swg/js/v1/swg-basic.js',
+        ].forEach(function (src) {
+          var s = document.createElement('script');
+          s.src = src;
+          s.async = true;
+          if (src.indexOf('googlesyndication.com') !== -1) s.crossOrigin = 'anonymous';
+          document.head.appendChild(s);
+        });
+      }
+      if (document.readyState === 'complete') {
+        loadDeferredThirdPartyScripts();
+      } else {
+        window.addEventListener('load', loadDeferredThirdPartyScripts);
+      }
     </script>
   </head>
   <body class="bg-gray-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-['Cairo',sans-serif] antialiased selection:bg-rose-500 selection:text-white transition-colors duration-200">
