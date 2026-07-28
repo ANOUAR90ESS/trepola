@@ -15,6 +15,7 @@ import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import OpenAI from 'openai';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import sharp from 'sharp';
 import Parser from 'rss-parser';
 import { INITIAL_ARTICLES, INITIAL_COMMENTS } from './src/data/initialData.js';
 import { allCategoryPaths } from './src/utils/categoryRoutes.js';
@@ -113,7 +114,7 @@ app.use(express.json({ limit: '10mb' }));
 
 // Enterprise Security Headers Middleware
 app.use((_req, res, next) => {
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.googleadservices.com https://*.adtrafficquality.google; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://*.tile.openstreetmap.org https://news.google.com https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.googleadservices.com; connect-src 'self' https://*.supabase.co https://news.google.com https://news.google.com/rss/search https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.adtrafficquality.google https://*.googleadservices.com; frame-src 'self' https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.googleadservices.com https://*.adtrafficquality.google; frame-ancestors 'none';");
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.googleadservices.com https://*.adtrafficquality.google https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com https://news.google.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://*.tile.openstreetmap.org https://news.google.com https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.googleadservices.com https://*.adtrafficquality.google; connect-src 'self' https://*.supabase.co https://news.google.com https://news.google.com/rss/search https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.adtrafficquality.google https://*.googleadservices.com; frame-src 'self' https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.googleadservices.com https://*.adtrafficquality.google; frame-ancestors 'none';");
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -194,7 +195,9 @@ async function ensureImageBucket(admin: SupabaseClient) {
 }
 
 /**
- * Uploads a base64 PNG to Supabase Storage and returns its public URL.
+ * Uploads a base64 image to Supabase Storage and returns its public URL.
+ * Resizes to a max width of 1200px and re-encodes as WebP before upload so
+ * multi-MB AI-generated PNGs don't bloat page weight / LCP.
  * Prevents multi-MB base64 data URLs from being persisted in the database.
  */
 async function uploadBase64ToStorage(b64: string): Promise<string | null> {
@@ -202,10 +205,14 @@ async function uploadBase64ToStorage(b64: string): Promise<string | null> {
   if (!admin) return null;
   try {
     await ensureImageBucket(admin);
-    const buffer = Buffer.from(b64, 'base64');
-    const fileName = `ai/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.png`;
+    const rawBuffer = Buffer.from(b64, 'base64');
+    const buffer = await sharp(rawBuffer)
+      .resize({ width: 1200, withoutEnlargement: true })
+      .webp({ quality: 75 })
+      .toBuffer();
+    const fileName = `ai/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.webp`;
     const { error } = await admin.storage.from(IMAGE_BUCKET).upload(fileName, buffer, {
-      contentType: 'image/png',
+      contentType: 'image/webp',
       cacheControl: '31536000',
       upsert: false,
     });

@@ -24,13 +24,23 @@ export const AdPlaceholder: React.FC<AdPlaceholderProps> = React.memo(({
   const [closed, setClosed] = useState(false);
 
   useEffect(() => {
-    try {
-      if (typeof window !== 'undefined' && window.adsbygoogle) {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
+    const pushAd = () => {
+      try {
+        if (typeof window !== 'undefined' && window.adsbygoogle) {
+          (window.adsbygoogle = window.adsbygoogle || []).push({});
+        }
+      } catch {
+        // Ignore if AdBlocker blocks the push
       }
-    } catch {
-      // Ignore if AdBlocker blocks the push
+    };
+
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const id = window.requestIdleCallback(pushAd, { timeout: 2000 });
+      return () => window.cancelIdleCallback?.(id);
     }
+
+    const timeoutId = setTimeout(pushAd, 1);
+    return () => clearTimeout(timeoutId);
   }, []);
 
   if (closed) return null;
