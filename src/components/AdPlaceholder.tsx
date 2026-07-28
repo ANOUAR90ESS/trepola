@@ -74,29 +74,42 @@ export const AdPlaceholder: React.FC<AdPlaceholderProps> = React.memo(({
     );
   }
 
-  let minHeight = '250px';
+  let adHeight = '250px';
   let googleAdFormat = 'auto';
   let currentAdSlot = adSlot;
+  // 'autorelaxed' (in-article) ads are intentionally variable-height by Google's
+  // own design, meant to flow with article content -- clipping them would cut
+  // the creative off mid-content, so only the fixed-shape formats get clipped.
+  let clip = true;
 
-  if (format === 'horizontal') minHeight = '120px';
-  if (format === 'vertical') minHeight = '600px';
+  if (format === 'horizontal') adHeight = '120px';
+  if (format === 'vertical') adHeight = '600px';
   if (format === 'in-article-p3') {
-    minHeight = '150px';
+    adHeight = '150px';
     googleAdFormat = 'autorelaxed';
+    clip = false;
     if (adSlot === '3426115392') {
       currentAdSlot = '8602420455';
     }
   }
 
+  // Same AdSense full-width-responsive quirk as the sticky-footer ad: Google's
+  // script overrides this element's own inline height with !important, so the
+  // hard height/overflow clip has to live on a plain outer div it never touches.
   return (
-    <div className={`relative overflow-hidden w-full mx-auto bg-slate-50 dark:bg-slate-800/30 rounded-xl flex items-center justify-center ${className}`} style={{ minHeight }}>
-      <div className="w-full h-full">
-        <ins className="adsbygoogle"
-             style={{ display: 'block' }}
-             data-ad-client="ca-pub-9054863881104831"
-             data-ad-slot={currentAdSlot}
-             data-ad-format={googleAdFormat}
-             data-full-width-responsive="true"></ins>
+    <div className="w-full mx-auto" style={clip ? { height: adHeight, overflow: 'hidden' } : undefined}>
+      <div
+        className={`relative overflow-hidden w-full h-full mx-auto bg-slate-50 dark:bg-slate-800/30 rounded-xl flex items-center justify-center ${className}`}
+        style={clip ? undefined : { minHeight: adHeight }}
+      >
+        <div className="w-full h-full">
+          <ins className="adsbygoogle"
+               style={{ display: 'block' }}
+               data-ad-client="ca-pub-9054863881104831"
+               data-ad-slot={currentAdSlot}
+               data-ad-format={googleAdFormat}
+               data-full-width-responsive="true"></ins>
+        </div>
       </div>
     </div>
   );

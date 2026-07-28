@@ -124,19 +124,23 @@
 
     <!-- Load gtag.js, adsbygoogle.js and swg-basic.js after the page finishes
          loading instead of eagerly in <head>, so they don't contend with our
-         own CSS/JS for bandwidth during the initial paint on mobile. -->
+         own CSS/JS for bandwidth during the initial paint on mobile. Staggered
+         with a delay between each so their parse/execute bursts don't all land
+         in the same task and collide with a real user's first tap (bad INP). -->
     <script>
       function loadDeferredThirdPartyScripts() {
         [
           'https://www.googletagmanager.com/gtag/js?id=G-V9DNYS0MMG',
           'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9054863881104831',
           'https://news.google.com/swg/js/v1/swg-basic.js',
-        ].forEach(function (src) {
-          var s = document.createElement('script');
-          s.src = src;
-          s.async = true;
-          if (src.indexOf('googlesyndication.com') !== -1) s.crossOrigin = 'anonymous';
-          document.head.appendChild(s);
+        ].forEach(function (src, i) {
+          setTimeout(function () {
+            var s = document.createElement('script');
+            s.src = src;
+            s.async = true;
+            if (src.indexOf('googlesyndication.com') !== -1) s.crossOrigin = 'anonymous';
+            document.head.appendChild(s);
+          }, i * 300);
         });
       }
       if (document.readyState === 'complete') {
