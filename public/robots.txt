@@ -1,6 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://www.trepola.com/sitemap.xml
-Sitemap: https://www.trepola.com/news-sitemap.xml
-Sitemap: https://www.trepola.com/image-sitemap.xml
