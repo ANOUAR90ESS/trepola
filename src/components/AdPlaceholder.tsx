@@ -46,22 +46,29 @@ export const AdPlaceholder: React.FC<AdPlaceholderProps> = React.memo(({
   if (closed) return null;
 
   if (format === 'sticky-footer') {
+    // AdSense's full-width-responsive script rewrites its immediate fixed-position
+    // ancestor's inline style (height/min-height) with !important, overriding any
+    // height we set on that element directly. This outer div is a plain wrapper
+    // Google's script has no reason to touch; it clips whatever height the inner
+    // div gets resized to, so the fixed element Lighthouse tracks never moves.
     return (
-      <div className={`fixed bottom-0 inset-x-0 z-50 bg-slate-900 border-t border-slate-700 shadow-2xl flex items-center justify-center ${className}`} style={{ height: '90px', overflow: 'hidden' }}>
-        <button
-          onClick={() => setClosed(true)}
-          aria-label="Cerrar anuncio"
-          className="absolute top-1 right-2 p-1 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors z-10"
-        >
-          <X className="w-5 h-5" />
-        </button>
-        <div className="w-full max-w-4xl mx-auto overflow-hidden">
-          <ins className="adsbygoogle"
-               style={{ display: 'block' }}
-               data-ad-client="ca-pub-9054863881104831"
-               data-ad-slot={adSlot}
-               data-ad-format="horizontal"
-               data-full-width-responsive="true"></ins>
+      <div className="fixed bottom-0 inset-x-0 z-50" style={{ height: '90px', overflow: 'hidden' }}>
+        <div className={`h-full bg-slate-900 border-t border-slate-700 shadow-2xl flex items-center justify-center ${className}`}>
+          <button
+            onClick={() => setClosed(true)}
+            aria-label="Cerrar anuncio"
+            className="absolute top-1 right-2 p-1 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors z-10"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <div className="w-full max-w-4xl mx-auto overflow-hidden">
+            <ins className="adsbygoogle"
+                 style={{ display: 'block' }}
+                 data-ad-client="ca-pub-9054863881104831"
+                 data-ad-slot={adSlot}
+                 data-ad-format="horizontal"
+                 data-full-width-responsive="true"></ins>
+          </div>
         </div>
       </div>
     );
