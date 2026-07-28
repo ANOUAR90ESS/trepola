@@ -1,0 +1,6 @@
+{
+  "name": "Trepola | Noticias Locales, Tecnología, Deportes y Actualidad",
+  "description": "Portal de noticias locales con secciones de tecnología, deportes, política, economía y actualidad general, generación de artículos asistida por IA y panel de administración.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

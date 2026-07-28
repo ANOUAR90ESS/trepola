@@ -1,0 +1,27 @@
+# Trepola - Portal de Noticias Locales y Globales
+
+> Trepola es la plataforma de periodismo digital e información hiperlocal que ofrece cobertura las 24 horas en noticias locales, tecnología, deportes, política, economía y cultura.
+
+## Secciones Principales
+
+- [Portada de Noticias](https://www.trepola.com/)
+- [Sección de Tecnología](https://www.trepola.com/categoria/tech)
+- [Sección de Deportes](https://www.trepola.com/categoria/sports)
+- [Sección de Política](https://www.trepola.com/categoria/politics)
+- [Sección de Economía](https://www.trepola.com/categoria/economy)
+- [Sección de Cultura](https://www.trepola.com/categoria/culture)
+
+## Ediciones Regionales
+
+- [Edición Madrid](https://www.trepola.com/ciudad/madrid)
+- [Edición Barcelona](https://www.trepola.com/ciudad/barcelona)
+- [Edición Valencia](https://www.trepola.com/ciudad/valencia)
+- [Edición Sevilla](https://www.trepola.com/ciudad/sevilla)
+- [Edición Londres](https://www.trepola.com/ciudad/london)
+- [Edición Nueva York](https://www.trepola.com/ciudad/newyork)
+- [Edición Riad](https://www.trepola.com/ciudad/riyadh)
+
+## Información de Contacto y Legal
+
+- [Redacción y Prensa](mailto:contact@trepola.com)
+- [Mapa del Sitio Sitemap](https://www.trepola.com/sitemap.xml)
