@@ -19,6 +19,7 @@ import { Article, ArticleCategory, GoogleNewsImportItem, Neighborhood, Comment }
 import { Language, UI_STRINGS } from '../i18n/translations';
 import { getLocalizedField } from '../utils/i18nHelpers';
 import { slugify } from '../utils/slug';
+import { useAuth } from '../lib/auth-context';
 
 interface AdminDashboardProps {
   language: Language;
@@ -42,6 +43,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onReorderArticles,
 }) => {
   const strings = UI_STRINGS[language] || UI_STRINGS.es;
+  const { token } = useAuth();
   const [adminTab, setAdminTab] = useState<'google-news' | 'ai-writer' | 'ai-image' | 'manual' | 'analytics'>('google-news');
   const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
   const [draggedOverItemIndex, setDraggedOverItemIndex] = useState<number | null>(null);
@@ -106,6 +108,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [manualImage, setManualImage] = useState('https://images.unsplash.com/photo-1588880331179-bc9b93a8cb5e?auto=format&fit=crop&w=1200&q=80');
   const [manualKeywords, setManualKeywords] = useState('noticias, ciudad, eventos');
   const [manualIsUrgent, setManualIsUrgent] = useState(false);
+
+  // 4.5 AI Article Generator (Claude) State
+  const [showClaudeTopicInput, setShowClaudeTopicInput] = useState(false);
+  const [claudeTopic, setClaudeTopic] = useState('');
+  const [generatingArticleWithClaude, setGeneratingArticleWithClaude] = useState(false);
+  const [claudeArticleError, setClaudeArticleError] = useState('');
 
   // 5. AI Auto-Classification State
   const [aiClassification, setAiClassification] = useState<any | null>(null);
@@ -421,6 +429,58 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setManualIsUrgent(!!art.isUrgent);
     setAdminTab('manual');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Maps Claude's Spanish category label to the internal <select> value
+  const mapClaudeCategory = (cat: string): ArticleCategory => {
+    const normalized = (cat || '').toLowerCase();
+    if (normalized.includes('tecno')) return 'tech';
+    if (normalized.includes('deport')) return 'sports';
+    if (normalized.includes('pol')) return 'politics';
+    if (normalized.includes('econom')) return 'economy';
+    if (normalized.includes('cultur')) return 'culture';
+    return 'general';
+  };
+
+  // Generate a full article from a topic using Claude (Anthropic)
+  const handleGenerateArticleWithClaude = async () => {
+    if (!claudeTopic.trim() || generatingArticleWithClaude) return;
+    if (!token) {
+      setClaudeArticleError('Sesión expirada. Vuelve a iniciar sesión.');
+      return;
+    }
+
+    setGeneratingArticleWithClaude(true);
+    setClaudeArticleError('');
+    try {
+      const res = await fetch('/api/generate-article', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ topic: claudeTopic.trim() }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setClaudeArticleError(data.message || 'No se pudo generar el artículo.');
+        return;
+      }
+
+      const result = data.data || {};
+      setManualTitle(result.title || '');
+      setManualContent(result.content || '');
+      setManualCategory(mapClaudeCategory(result.category));
+      setManualKeywords(result.keywords || '');
+      setManualExcerpt(result.metaDescription || '');
+      setManualSlug(slugify(result.slug || result.title || ''));
+      setSlugManuallyEdited(true);
+      setShowClaudeTopicInput(false);
+      setClaudeTopic('');
+    } catch (err) {
+      console.error('Claude article generation error:', err);
+      setClaudeArticleError('No se pudo conectar con el servidor.');
+    } finally {
+      setGeneratingArticleWithClaude(false);
+    }
   };
 
   // Manual Article Submit (Create or Update)
@@ -1025,7 +1085,57 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Content:</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">Content:</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setClaudeArticleError('');
+                    setShowClaudeTopicInput((v) => !v);
+                  }}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1 shadow-xs disabled:opacity-50"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Generar artículo con IA</span>
+                </button>
+              </div>
+
+              {showClaudeTopicInput && (
+                <div className="mb-2 p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-2">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Tema del artículo:
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="text"
+                      value={claudeTopic}
+                      onChange={(e) => setClaudeTopic(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleGenerateArticleWithClaude();
+                        }
+                      }}
+                      placeholder="Ej: artículo 50 AI Act España"
+                      disabled={generatingArticleWithClaude}
+                      className="flex-1 bg-white dark:bg-slate-800 p-2.5 rounded-xl text-xs border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white disabled:opacity-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleGenerateArticleWithClaude}
+                      disabled={generatingArticleWithClaude || !claudeTopic.trim()}
+                      className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-xs px-4 py-2.5 rounded-xl transition-all flex items-center justify-center gap-1 shadow-xs disabled:opacity-50 shrink-0"
+                    >
+                      {generatingArticleWithClaude ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                      <span>{generatingArticleWithClaude ? 'Generando...' : 'Generar'}</span>
+                    </button>
+                  </div>
+                  {claudeArticleError && (
+                    <p className="text-xs font-semibold text-red-600 dark:text-red-400">{claudeArticleError}</p>
+                  )}
+                </div>
+              )}
+
               <textarea
                 rows={5}
                 value={manualContent}

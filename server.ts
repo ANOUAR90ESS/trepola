@@ -14,6 +14,7 @@ import { eq, desc, and } from 'drizzle-orm';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import sharp from 'sharp';
 import Parser from 'rss-parser';
@@ -165,6 +166,20 @@ function getGeminiAI() {
     return new GoogleGenAI({ apiKey });
   } catch (e) {
     console.warn('GoogleGenAI client init notice:', e);
+    return null;
+  }
+}
+
+// Helper: Anthropic (Claude) Client for the SEO article generator
+function getAnthropicClient() {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || apiKey.includes('your-anthropic-api-key') || apiKey.length < 10) {
+    return null;
+  }
+  try {
+    return new Anthropic({ apiKey });
+  } catch (e) {
+    console.warn('Anthropic client init notice:', e);
     return null;
   }
 }
@@ -388,6 +403,77 @@ Escribe todos los valores de texto en español.`;
         readTimeMinutes: 3,
       }
     });
+  }
+});
+
+// 2.5. AI Article Generator using Claude (Anthropic) — SEO-focused, requires the same
+// admin auth as /api/articles. Only pre-fills the manual article form; the admin still
+// has to review and hit "Publicar artículo" themselves.
+app.post('/api/generate-article', requireAdmin, async (req, res) => {
+  try {
+    const { topic } = req.body || {};
+    if (!topic || typeof topic !== 'string' || !topic.trim()) {
+      return res.status(400).json({ success: false, message: 'Falta el tema del artículo.' });
+    }
+
+    const anthropic = getAnthropicClient();
+    if (!anthropic) {
+      return res.status(500).json({ success: false, message: 'La generación con Claude no está configurada (falta ANTHROPIC_API_KEY).' });
+    }
+
+    const systemPrompt = `Eres el redactor jefe de Trepola, un sitio de noticias en español que cubre tecnología (especialmente IA), deportes, política, economía y cultura, con audiencia mayoritariamente en España.
+
+Reglas de estilo y SEO (basadas en datos reales de rendimiento del sitio):
+- NUNCA titules con términos genéricos y saturados como "últimas noticias de IA", "noticias de tecnología hoy" o equivalentes en otros temas (ej. "noticias del Real Madrid hoy"). Esos términos tienen posición media >70 en Google y cero clics.
+- Prioriza ángulos específicos y de cola larga: nombres concretos de herramientas/modelos/personas/eventos, comparativas directas, guías prácticas ("cómo usar X"), o el impacto de una noticia global en España concretamente.
+- Si el tema es sobre una herramienta de IA, incluye el nombre exacto de la herramienta en el título (esto ya ha funcionado: un artículo sobre "Kimi 3.0" alcanzó posición 9 en Google).
+- Si el tema toca regulación, privacidad o ciberseguridad, dale un enfoque práctico y accionable para empresas o usuarios españoles (este tipo de contenido ya logró 100% de CTR en el sitio).
+- Escribe en español de España, tono periodístico claro, sin sensacionalismo.
+- Estructura el contenido en markdown con 2-4 subtítulos ## y usa listas cuando aporte claridad.
+- Longitud objetivo: 500-800 palabras.
+- No inventes datos, cifras ni citas. Si no tienes información verificada suficiente sobre el tema exacto, escribe el artículo con la información general contrastable que tengas y evita afirmaciones muy específicas no verificables.
+
+Genera también:
+- slug: una versión kebab-case del título, sin acentos ni caracteres especiales, máximo 60 caracteres, optimizada para SEO (incluye la palabra clave principal).
+- metaDescription: 120-155 caracteres, en español, que resuma el artículo de forma atractiva para que alguien haga clic desde los resultados de Google.
+
+Devuelve ÚNICAMENTE un objeto JSON válido, sin texto antes ni después, sin backticks de markdown, con las claves: title, slug, metaDescription, content, category, keywords.`;
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4000,
+      thinking: { type: 'adaptive' },
+      output_config: { effort: 'medium' },
+      system: systemPrompt,
+      messages: [
+        { role: 'user', content: `Escribe un artículo sobre: ${topic.trim()}` },
+      ],
+    });
+
+    const textBlock = message.content.find((b) => b.type === 'text') as { type: 'text'; text: string } | undefined;
+    const rawText = textBlock?.text || '';
+
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      const stripped = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+      try {
+        parsed = JSON.parse(stripped);
+      } catch (parseErr) {
+        console.error('Claude article JSON parse failed:', rawText);
+        return res.status(500).json({ success: false, message: 'La IA devolvió una respuesta que no se pudo interpretar. Inténtalo de nuevo.' });
+      }
+    }
+
+    if (!parsed || !parsed.title || !parsed.content) {
+      return res.status(500).json({ success: false, message: 'La IA devolvió una respuesta incompleta.' });
+    }
+
+    res.json({ success: true, data: parsed });
+  } catch (error: any) {
+    console.error('Generate article (Claude) error:', error?.message || error);
+    res.status(500).json({ success: false, message: 'Error generando el artículo con IA.' });
   }
 });
 
