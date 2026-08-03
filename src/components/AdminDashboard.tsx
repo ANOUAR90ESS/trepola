@@ -432,8 +432,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // Maps Claude's Spanish category label to the internal <select> value
-  const mapClaudeCategory = (cat: string): ArticleCategory => {
-    const normalized = (cat || '').toLowerCase();
+  const mapClaudeCategory = (cat: unknown): ArticleCategory => {
+    const normalized = String(Array.isArray(cat) ? cat.join(' ') : (cat || '')).toLowerCase();
     if (normalized.includes('tecno')) return 'tech';
     if (normalized.includes('deport')) return 'sports';
     if (normalized.includes('pol')) return 'politics';
@@ -469,7 +469,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setManualTitle(result.title || '');
       setManualContent(result.content || '');
       setManualCategory(mapClaudeCategory(result.category));
-      setManualKeywords(result.keywords || '');
+      setManualKeywords(Array.isArray(result.keywords) ? result.keywords.join(', ') : (result.keywords || ''));
       setManualExcerpt(result.metaDescription || '');
       setManualSlug(slugify(result.slug || result.title || ''));
       setSlugManuallyEdited(true);
@@ -511,7 +511,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         viewsCount: existing ? existing.viewsCount : 1,
         likesCount: existing ? existing.likesCount : 0,
         commentsCount: existing ? existing.commentsCount : 0,
-        seoKeywords: manualKeywords.split(',').map((k) => k.trim()),
+        seoKeywords: String(manualKeywords || '').split(',').map((k) => k.trim()).filter(Boolean),
         metaDescription: manualExcerpt,
         source: existing ? existing.source : 'Direct',
       };
@@ -552,7 +552,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         viewsCount: 1,
         likesCount: 0,
         commentsCount: 0,
-        seoKeywords: manualKeywords.split(',').map((k) => k.trim()),
+        seoKeywords: String(manualKeywords || '').split(',').map((k) => k.trim()).filter(Boolean),
         metaDescription: manualExcerpt,
         source: 'Direct',
       };
