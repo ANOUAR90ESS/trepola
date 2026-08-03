@@ -107,60 +107,24 @@
       gtag('config', 'G-V9DNYS0MMG');
     </script>
 
-    <!-- Subscribe with Google (SwG Basic) queue stub, same deferred-load reasoning. -->
-    <script>
-      (self.SWG_BASIC = self.SWG_BASIC || []).push((basicSubscriptions) => {
-        basicSubscriptions.init({
-          type: "NewsArticle",
-          isPartOfType: ["Product"],
-          isPartOfProductId: "CAownqnMDA:openaccess",
-          clientOptions: {
-            theme: "light",
-            lang: "es",
-          },
-        });
-      });
-    </script>
+    <!-- Load gtag.js and adsbygoogle.js after the page finishes loading instead
+         of eagerly in <head>, so they don't contend with our own CSS/JS for
+         bandwidth during the initial paint on mobile. Staggered with a delay
+         between each so their parse/execute bursts don't all land in the same
+         task and collide with a real user's first tap (bad INP).
 
-    <!-- swg-basic.js injects a <swg-popup-background role="button"> element with
-         no accessible name (fails "ARIA commands must have an accessible name").
-         We don't control that markup, so patch it in place the moment it appears. -->
-    <script>
-      (function () {
-        function patchSwgPopupBackground(el) {
-          if (!el.hasAttribute('aria-label')) {
-            el.setAttribute('aria-label', 'Cerrar ventana emergente');
-          }
-        }
-        var existing = document.querySelector('swg-popup-background');
-        if (existing) patchSwgPopupBackground(existing);
-        new MutationObserver(function (mutations) {
-          mutations.forEach(function (mutation) {
-            mutation.addedNodes.forEach(function (node) {
-              if (node.nodeType !== 1) return;
-              if (node.tagName && node.tagName.toLowerCase() === 'swg-popup-background') {
-                patchSwgPopupBackground(node);
-              } else if (node.querySelector) {
-                var nested = node.querySelector('swg-popup-background');
-                if (nested) patchSwgPopupBackground(nested);
-              }
-            });
-          });
-        }).observe(document.documentElement, { childList: true, subtree: true });
-      })();
-    </script>
-
-    <!-- Load gtag.js, adsbygoogle.js and swg-basic.js after the page finishes
-         loading instead of eagerly in <head>, so they don't contend with our
-         own CSS/JS for bandwidth during the initial paint on mobile. Staggered
-         with a delay between each so their parse/execute bursts don't all land
-         in the same task and collide with a real user's first tap (bad INP). -->
+         Subscribe with Google (SwG Basic) was removed: its swg-basic.js script
+         injects a full-screen <swg-popup-background> backdrop (dark overlay,
+         pointer-events: auto, max z-index) a few seconds after load, on every
+         page, for every visitor -- with no accompanying dialog ever rendering.
+         The backdrop never dismisses itself, silently blocking every click on
+         the entire site. Re-add only once that's fixed/reconfigured on
+         Google's side. -->
     <script>
       function loadDeferredThirdPartyScripts() {
         [
           'https://www.googletagmanager.com/gtag/js?id=G-V9DNYS0MMG',
           'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9054863881104831',
-          'https://news.google.com/swg/js/v1/swg-basic.js',
         ].forEach(function (src, i) {
           setTimeout(function () {
             var s = document.createElement('script');
