@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, Eye, MessageSquare, Bookmark, MapPin, Sparkles, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Clock, Eye, MessageSquare, Bookmark, Sparkles, ChevronRight, AlertTriangle } from 'lucide-react';
 import { Article } from '../types';
 import { Language, UI_STRINGS } from '../i18n/translations';
 import { getLocalizedField } from '../utils/i18nHelpers';
@@ -74,10 +74,6 @@ export const HeroFeaturedNews: React.FC<HeroFeaturedNewsProps> = ({
               )}
               <span className="bg-rose-600/90 text-white backdrop-blur-md text-xs font-bold px-3 py-1 rounded-full shadow-md">
                 {mainArticle.category}
-              </span>
-              <span className="bg-slate-900/80 text-amber-300 backdrop-blur-md text-xs font-bold px-3 py-1 rounded-full border border-amber-500/30 flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-amber-400" />
-                {mainArticle.neighborhood}
               </span>
             </div>
 
@@ -176,8 +172,6 @@ export const HeroFeaturedNews: React.FC<HeroFeaturedNewsProps> = ({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 text-[11px] font-bold text-rose-600 dark:text-rose-400 mb-1">
                     <span>{art.category}</span>
-                    <span className="text-slate-300 dark:text-slate-600">•</span>
-                    <span className="text-slate-500 dark:text-slate-400 font-normal">📍 {art.neighborhood}</span>
                   </div>
 
                   <h4 className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm leading-snug line-clamp-2 group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors mb-2">

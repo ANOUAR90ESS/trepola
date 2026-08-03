@@ -80,8 +80,6 @@ export const SmartSearchModal: React.FC<SmartSearchModalProps> = ({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 text-[10px] font-bold text-rose-600 dark:text-rose-400 mb-1">
                       <span>{art.category}</span>
-                      <span className="text-slate-300">•</span>
-                      <span className="text-slate-500 font-medium">📍 {art.neighborhood}</span>
                     </div>
                     <h4 className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm line-clamp-2 leading-snug group-hover:text-rose-600 transition-colors">
                       {title}

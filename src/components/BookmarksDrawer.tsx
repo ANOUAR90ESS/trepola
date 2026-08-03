@@ -73,7 +73,7 @@ export const BookmarksDrawer: React.FC<BookmarksDrawerProps> = ({
                   />
                   <div className="flex-1 min-w-0">
                     <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 block mb-0.5">
-                      📍 {art.neighborhood} • {art.category}
+                      {art.category}
                     </span>
                     <h4 className="font-bold text-slate-900 dark:text-white text-xs line-clamp-2 leading-snug group-hover:text-rose-600 transition-colors">
                       {title}

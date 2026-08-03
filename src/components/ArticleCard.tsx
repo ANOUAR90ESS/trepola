@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, MessageSquare, Bookmark, MapPin, Share2, AlertTriangle } from 'lucide-react';
+import { Clock, MessageSquare, Bookmark, Share2, AlertTriangle } from 'lucide-react';
 import { Article } from '../types';
 import { Language, UI_STRINGS } from '../i18n/translations';
 import { getLocalizedField } from '../utils/i18nHelpers';
@@ -80,14 +80,6 @@ export const ArticleCard: React.FC<ArticleCardProps> = React.memo(({
             )}
             <span className="bg-slate-900/90 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded border border-white/20">
               {article.category}
-            </span>
-          </div>
-
-          {/* Neighborhood Pill bottom-right on image */}
-          <div className="absolute bottom-2.5 right-2.5 z-10">
-            <span className="bg-slate-900/85 text-amber-300 backdrop-blur-md text-[10px] font-bold px-2 py-0.5 rounded border border-amber-500/30 flex items-center gap-1">
-              <MapPin className="w-3 h-3 text-amber-400" />
-              {article.neighborhood}
             </span>
           </div>
 

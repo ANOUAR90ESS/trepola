@@ -261,10 +261,6 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
               <span className="bg-rose-600 text-white text-xs font-bold px-3 py-1 rounded-full">
                 {article.category}
               </span>
-              <span className="bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 text-xs font-bold px-3 py-1 rounded-full border border-amber-300 dark:border-amber-800 flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-amber-500" />
-                {article.neighborhood}
-              </span>
               <span className="text-slate-500 dark:text-slate-400 text-xs flex items-center gap-1 ml-auto">
                 <Clock className="w-3.5 h-3.5" />
                 {article.publishedAt}
@@ -593,11 +589,6 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
                       <div className="flex items-center justify-between mb-1">
                         <h5 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1.5">
                           {comm.authorName}
-                          {comm.isNeighborhoodResident && (
-                            <span className="text-[10px] bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 px-1.5 py-0.5 rounded font-bold">
-                              📍 {article.neighborhood}
-                            </span>
-                          )}
                         </h5>
                         <span className="text-[10px] text-slate-400">{comm.createdAt}</span>
                       </div>
