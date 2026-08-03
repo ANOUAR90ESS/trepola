@@ -96,8 +96,13 @@ export const AdPlaceholder: React.FC<AdPlaceholderProps> = React.memo(({
   // Same AdSense full-width-responsive quirk as the sticky-footer ad: Google's
   // script overrides this element's own inline height with !important, so the
   // hard height/overflow clip has to live on a plain outer div it never touches.
+  // 'autorelaxed' ads aren't hard-clipped (see note above) but on narrow mobile
+  // viewports Google can still size them very tall; cap just the mobile height
+  // so they don't dominate the screen, while leaving desktop fully unconstrained.
+  const mobileCapClass = format === 'in-article-p3' ? 'max-h-[300px] overflow-hidden sm:max-h-none sm:overflow-visible' : '';
+
   return (
-    <div className="w-full mx-auto" style={clip ? { height: adHeight, overflow: 'hidden' } : undefined}>
+    <div className={`w-full mx-auto ${mobileCapClass}`} style={clip ? { height: adHeight, overflow: 'hidden' } : undefined}>
       <div
         className={`relative overflow-hidden w-full h-full mx-auto bg-slate-50 dark:bg-slate-800/30 rounded-xl flex items-center justify-center ${className}`}
         style={clip ? undefined : { minHeight: adHeight }}

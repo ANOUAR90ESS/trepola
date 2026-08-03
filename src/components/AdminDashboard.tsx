@@ -18,6 +18,7 @@ import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recha
 import { Article, ArticleCategory, GoogleNewsImportItem, Neighborhood, Comment } from '../types';
 import { Language, UI_STRINGS } from '../i18n/translations';
 import { getLocalizedField } from '../utils/i18nHelpers';
+import { slugify } from '../utils/slug';
 
 interface AdminDashboardProps {
   language: Language;
@@ -97,6 +98,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // 4. Manual Article State
   const [manualTitle, setManualTitle] = useState('');
   const [manualExcerpt, setManualExcerpt] = useState('');
+  const [manualSlug, setManualSlug] = useState('');
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [manualContent, setManualContent] = useState('');
   const [manualCategory, setManualCategory] = useState<ArticleCategory>('Noticias Locales');
   const [manualNeighborhood, setManualNeighborhood] = useState<Neighborhood>('Centro / Moncloa');
@@ -413,6 +416,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setManualNeighborhood(art.neighborhood || 'Centro / Moncloa');
     setManualImage(art.imageUrl || '');
     setManualKeywords(Array.isArray(art.seoKeywords) ? art.seoKeywords.join(', ') : '');
+    setManualSlug(art.slug || '');
+    setSlugManuallyEdited(true);
     setManualIsUrgent(!!art.isUrgent);
     setAdminTab('manual');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -427,6 +432,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const existing = articles.find((a) => a.id === editingArticleId);
       const updatedArticle: Article = {
         id: editingArticleId,
+        slug: slugify(manualSlug) || slugify(manualTitle) || undefined,
         title: manualTitle,
         excerpt: manualExcerpt || manualTitle,
         content: manualContent,
@@ -459,12 +465,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setEditingArticleId(null);
       setManualTitle('');
       setManualExcerpt('');
+      setManualSlug('');
+      setSlugManuallyEdited(false);
       setManualContent('');
       setManualKeywords('');
       alert('¡Artículo actualizado con éxito!');
     } else {
       const newArticle: Article = {
         id: `art-${Date.now()}`,
+        slug: slugify(manualSlug) || slugify(manualTitle) || undefined,
         title: manualTitle,
         excerpt: manualExcerpt || manualTitle,
         content: manualContent,
@@ -491,6 +500,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       onAddArticle(newArticle);
       setManualTitle('');
       setManualExcerpt('');
+      setManualSlug('');
+      setSlugManuallyEdited(false);
       setManualContent('');
       setManualKeywords('');
       alert('¡Artículo publicado con éxito!');
@@ -971,9 +982,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <input
                 type="text"
                 value={manualTitle}
-                onChange={(e) => setManualTitle(e.target.value)}
+                onChange={(e) => {
+                  const newTitle = e.target.value;
+                  setManualTitle(newTitle);
+                  if (!slugManuallyEdited) {
+                    setManualSlug(slugify(newTitle));
+                  }
+                }}
                 className="w-full bg-slate-50 dark:bg-slate-900 p-3 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                 required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Slug (URL): <span className="font-normal text-slate-400">/news/{manualSlug || '...'}</span>
+              </label>
+              <input
+                type="text"
+                value={manualSlug}
+                onChange={(e) => {
+                  setSlugManuallyEdited(true);
+                  setManualSlug(slugify(e.target.value));
+                }}
+                placeholder="se-genera-automaticamente-del-titulo"
+                className="w-full bg-slate-50 dark:bg-slate-900 p-3 rounded-xl text-xs border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Extracto / Meta descripción (SEO): <span className="font-normal text-slate-400">{manualExcerpt.length}/160</span>
+              </label>
+              <textarea
+                rows={2}
+                maxLength={160}
+                value={manualExcerpt}
+                onChange={(e) => setManualExcerpt(e.target.value)}
+                placeholder="Resumen breve del artículo, usado como extracto en las tarjetas y como meta descripción para buscadores."
+                className="w-full bg-slate-50 dark:bg-slate-900 p-3 rounded-xl text-xs border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
               />
             </div>
 
@@ -1240,7 +1287,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   />
                   <div className="min-w-0">
                     <span className="text-[10px] font-bold text-rose-600 block">
-                      📍 {art.neighborhood} • {art.category}
+                      {art.category}
                     </span>
                     <h4 className="font-bold text-slate-900 dark:text-white text-xs truncate max-w-md">
                       {title}
