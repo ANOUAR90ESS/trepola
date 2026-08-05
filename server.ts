@@ -193,6 +193,43 @@ function getAnthropicClient() {
 }
 
 /**
+ * Long "text"-style fields occasionally contain a literal newline/tab instead
+ * of an escaped \n — invalid per the JSON spec, but common in long-form LLM
+ * output. Walks the string tracking string/escape state (never touching
+ * structural whitespace outside string literals) and escapes stray control
+ * characters found inside strings so JSON.parse can succeed.
+ */
+function escapeRawControlCharsInJsonStrings(text: string): string {
+  let result = '';
+  let inString = false;
+  let escapeNext = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (escapeNext) {
+      result += ch;
+      escapeNext = false;
+      continue;
+    }
+    if (ch === '\\' && inString) {
+      result += ch;
+      escapeNext = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      result += ch;
+      continue;
+    }
+    if (inString && (ch === '\n' || ch === '\r' || ch === '\t')) {
+      result += ch === '\n' ? '\\n' : ch === '\r' ? '\\r' : '\\t';
+      continue;
+    }
+    result += ch;
+  }
+  return result;
+}
+
+/**
  * Extracts and validates an InteractiveArticleData JSON object from Claude's
  * raw text response. Factored out as a pure function so it can be unit-tested
  * with a hand-crafted/pasted response string without a live API call.
@@ -205,17 +242,24 @@ function parseInteractiveArticleResponse(rawText: string): { title: string; exce
   try {
     parsed = JSON.parse(cleaned);
   } catch (e) {
-    // Fallback: the model may have left a stray sentence before/after the JSON
-    // despite instructions not to — extract the outermost {...} block and retry.
+    // Fallback 1: the model may have left a stray sentence before/after the
+    // JSON despite instructions not to — extract the outermost {...} block.
     const start = cleaned.indexOf('{');
     const end = cleaned.lastIndexOf('}');
     if (start === -1 || end === -1 || end <= start) {
       throw new Error('AI returned invalid JSON');
     }
+    const candidate = cleaned.slice(start, end + 1);
     try {
-      parsed = JSON.parse(cleaned.slice(start, end + 1));
+      parsed = JSON.parse(candidate);
     } catch (e2) {
-      throw new Error('AI returned invalid JSON');
+      // Fallback 2: same candidate, but with raw newlines/tabs inside string
+      // literals escaped — handles the common case above.
+      try {
+        parsed = JSON.parse(escapeRawControlCharsInJsonStrings(candidate));
+      } catch (e3) {
+        throw new Error('AI returned invalid JSON');
+      }
     }
   }
 
