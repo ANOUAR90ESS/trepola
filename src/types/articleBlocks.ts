@@ -134,6 +134,11 @@ export interface HeadingBlock {
   image?: SectionImage;
 }
 
+export interface FaqBlock {
+  type: 'faq';
+  items: { question: string; answer: string }[];
+}
+
 export type ContentBlock =
   | StatCardBlock
   | ComparisonTableBlock
@@ -150,7 +155,8 @@ export type ContentBlock =
   | QuizBlock
   | PracticeBlock
   | ParagraphBlock
-  | HeadingBlock;
+  | HeadingBlock
+  | FaqBlock;
 
 export const BLOCK_TYPES = [
   'stat-card',
@@ -169,6 +175,7 @@ export const BLOCK_TYPES = [
   'practice-block',
   'paragraph',
   'heading',
+  'faq',
 ] as const;
 
 export interface InteractiveArticleData {

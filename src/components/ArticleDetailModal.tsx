@@ -186,12 +186,25 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
     return content.split('\n\n').filter(Boolean);
   }, [content, isBlocksFormat]);
 
-  // Extract Table of Contents sections
+  // Table of Contents: real heading/sectionId anchors for blocks-format
+  // guides (see HeadingBlock, which renders id={sectionId}); best-effort
+  // heuristic for legacy plain-paragraph articles, which have no anchors to
+  // jump to — those entries are informational only.
   const tocSections = useMemo(() => {
+    if (isBlocksFormat) {
+      if (!parsedBlocks) return [];
+      return parsedBlocks
+        .filter((b): b is Extract<ContentBlock, { type: 'heading' }> => b.type === 'heading' && !!b.sectionId)
+        .map((b) => ({ id: b.sectionId as string, title: b.text }));
+    }
     return paragraphs
       .filter((p) => p.length < 80 && !p.includes('.'))
       .map((p, idx) => ({ id: `section-${idx}`, title: p }));
-  }, [paragraphs]);
+  }, [isBlocksFormat, parsedBlocks, paragraphs]);
+
+  const handleTocClick = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex justify-center p-2 sm:p-4 md:p-6 animate-fade-in">
@@ -353,9 +366,15 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
               </h4>
               <ul className="space-y-1.5 text-xs font-semibold text-rose-600 dark:text-rose-400">
                 {tocSections.map((sec) => (
-                  <li key={sec.id} className="hover:underline cursor-pointer flex items-center gap-1.5">
-                    <ChevronRight className="w-3 h-3 text-slate-400" />
-                    <span>{sec.title}</span>
+                  <li key={sec.id}>
+                    <button
+                      type="button"
+                      onClick={() => handleTocClick(sec.id)}
+                      className="hover:underline flex items-center gap-1.5 text-left w-full"
+                    >
+                      <ChevronRight className="w-3 h-3 text-slate-400 shrink-0" />
+                      <span>{sec.title}</span>
+                    </button>
                   </li>
                 ))}
               </ul>

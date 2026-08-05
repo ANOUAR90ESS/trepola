@@ -14,3 +14,4 @@ export { QuizBlock } from './QuizBlock';
 export { PracticeBlock } from './PracticeBlock';
 export { ParagraphBlock } from './ParagraphBlock';
 export { HeadingBlock } from './HeadingBlock';
+export { FaqBlock } from './FaqBlock';

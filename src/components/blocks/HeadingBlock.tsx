@@ -17,7 +17,10 @@ export const HeadingBlock: React.FC<{ block: HeadingBlockType }> = ({ block }) =
 
   return (
     <div className="space-y-4">
-      <Tag className={`font-headline font-black ${sizeClass} text-[#101418] dark:text-white tracking-tight`}>
+      <Tag
+        id={block.sectionId}
+        className={`font-headline font-black ${sizeClass} text-[#101418] dark:text-white tracking-tight scroll-mt-24`}
+      >
         {block.text}
       </Tag>
       {showImage && (

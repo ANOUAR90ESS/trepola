@@ -17,6 +17,7 @@ import {
   PracticeBlock,
   ParagraphBlock,
   HeadingBlock,
+  FaqBlock,
 } from './blocks';
 
 const BlockDispatch: React.FC<{ block: ContentBlock }> = ({ block }) => {
@@ -53,6 +54,8 @@ const BlockDispatch: React.FC<{ block: ContentBlock }> = ({ block }) => {
       return <ParagraphBlock block={block} />;
     case 'heading':
       return <HeadingBlock block={block} />;
+    case 'faq':
+      return <FaqBlock block={block} />;
     default:
       // Unknown block type from a model response — degrade gracefully instead of crashing the article page.
       if (import.meta.env.DEV) {

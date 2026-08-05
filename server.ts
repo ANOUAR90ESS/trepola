@@ -341,6 +341,14 @@ function postProcessInteractiveArticleData(data: any): any {
       }
     }
   }
+  // Rendered in-flow (accordion, see src/components/blocks/FaqBlock.tsx) so
+  // it shows up without any AdminDashboard/DB changes — it's carried by the
+  // same blocks JSON that already becomes `content`. Placed at the end,
+  // ahead of the final practice/tip wrap-up blocks if any (common FAQ
+  // placement — after the reader already has the full guide).
+  if (data.faq) {
+    data.blocks.push({ type: 'faq', items: data.faq });
+  }
   return data;
 }
 
@@ -1593,6 +1601,31 @@ app.get('*', async (req, res, next) => {
 
       const publishedDate = article.publishedAt || new Date().toISOString();
 
+      // Interactive guides may carry a 'faq' block (see FaqBlock.tsx) —
+      // surface it as FAQPage structured data for rich results.
+      let faqSchemaEntity: any = null;
+      if (article.contentFormat === 'blocks') {
+        try {
+          const blocks = JSON.parse(typeof article.content === 'string' ? article.content : '[]');
+          const faqBlock = Array.isArray(blocks)
+            ? blocks.find((b: any) => b && b.type === 'faq' && Array.isArray(b.items) && b.items.length > 0)
+            : null;
+          if (faqBlock) {
+            faqSchemaEntity = {
+              '@type': 'FAQPage',
+              '@id': `${canonicalUrl}#faq`,
+              'mainEntity': faqBlock.items.map((item: any) => ({
+                '@type': 'Question',
+                'name': item.question,
+                'acceptedAnswer': { '@type': 'Answer', 'text': item.answer },
+              })),
+            };
+          }
+        } catch {
+          // Malformed content JSON — skip FAQ schema, rest of the page still renders.
+        }
+      }
+
       const jsonLd = {
         '@context': 'https://schema.org',
         '@graph': [
@@ -1634,6 +1667,7 @@ app.get('*', async (req, res, next) => {
               { '@type': 'ListItem', 'position': 3, 'name': artTitle, 'item': canonicalUrl },
             ],
           },
+          ...(faqSchemaEntity ? [faqSchemaEntity] : []),
         ],
       };
 
