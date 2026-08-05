@@ -563,6 +563,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // article already being edited, with its real persisted id.
   const activeArticleIdForJobs = editingArticleId || manualDraftId || undefined;
 
+  // Publish readiness (blocks-format only). Section images are informational,
+  // never a hard requirement — a guide can ship without every section
+  // illustrated. Only gates NEW articles: editing an already-published one
+  // never gets locked out just because it predates this checklist.
+  const isBlocksDraft = manualContentFormat === 'blocks';
+  const publishReadiness = useMemo(() => {
+    const contentGenerated = manualTitle.trim().length > 0 && manualContent.trim().length > 0;
+    const seoReady =
+      manualMetaDescription.trim().length > 0 &&
+      String(manualKeywords || '').split(',').map((k) => k.trim()).filter(Boolean).length > 0;
+    const totalSectionImages = imageSections.length;
+    const readySectionImages = imageSections.filter((h) => h.image?.status === 'ready').length;
+    return { contentGenerated, seoReady, totalSectionImages, readySectionImages };
+  }, [manualTitle, manualContent, manualMetaDescription, manualKeywords, imageSections]);
+  const canPublish =
+    !isBlocksDraft || !!editingArticleId || (publishReadiness.contentGenerated && publishReadiness.seoReady);
+
   // Functional update so sequential (bulk) generations never clobber each
   // other via a stale manualContent closure — each call always reads the
   // latest committed state, regardless of how many are queued in a row.
@@ -1535,10 +1552,44 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </div>
 
+            {isBlocksDraft && !editingArticleId && (
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-1.5">
+                {[
+                  { label: 'Contenido generado', done: publishReadiness.contentGenerated, optional: false },
+                  { label: 'SEO listo (meta description + keywords)', done: publishReadiness.seoReady, optional: false },
+                  {
+                    label: `Imágenes de sección (${publishReadiness.readySectionImages}/${publishReadiness.totalSectionImages} listas)`,
+                    done: publishReadiness.totalSectionImages === 0 || publishReadiness.readySectionImages === publishReadiness.totalSectionImages,
+                    optional: true,
+                  },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-center gap-2 text-xs font-semibold">
+                    <span
+                      className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
+                        item.done
+                          ? 'bg-emerald-500 text-white'
+                          : item.optional
+                          ? 'bg-slate-200 dark:bg-slate-700 text-slate-400'
+                          : 'bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400'
+                      }`}
+                    >
+                      {item.done ? <Check className="w-3 h-3" /> : <span className="w-1.5 h-1.5 rounded-full bg-current" />}
+                    </span>
+                    <span className={item.done ? 'text-slate-600 dark:text-slate-300' : 'text-slate-500 dark:text-slate-400'}>
+                      {item.label}
+                    </span>
+                    {item.optional && !item.done && <span className="text-[10px] text-slate-400">(opcional)</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="flex items-center gap-3">
               <button
                 type="submit"
-                className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-black text-sm py-3.5 rounded-2xl transition-colors shadow-md flex items-center justify-center gap-2"
+                disabled={!canPublish}
+                title={!canPublish ? 'Completa el contenido y el SEO antes de publicar' : undefined}
+                className="flex-1 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-sm py-3.5 rounded-2xl transition-colors shadow-md flex items-center justify-center gap-2"
               >
                 {editingArticleId ? (
                   <>
