@@ -108,6 +108,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [manualImage, setManualImage] = useState('https://images.unsplash.com/photo-1588880331179-bc9b93a8cb5e?auto=format&fit=crop&w=1200&q=80');
   const [manualKeywords, setManualKeywords] = useState('noticias, ciudad, eventos');
   const [manualIsUrgent, setManualIsUrgent] = useState(false);
+  const [manualContentFormat, setManualContentFormat] = useState<'markdown' | 'blocks'>('markdown');
+  const [manualMetaDescription, setManualMetaDescription] = useState('');
+
+  // 4b. Interactive Execution-Guide Generator State (Claude + web_search)
+  const [interactiveTopic, setInteractiveTopic] = useState('');
+  const [showInteractivePrompt, setShowInteractivePrompt] = useState(false);
+  const [generatingInteractive, setGeneratingInteractive] = useState(false);
 
   // 4.5 AI Article Generator (Claude) State
   const [showClaudeTopicInput, setShowClaudeTopicInput] = useState(false);
@@ -427,6 +434,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setManualSlug(art.slug || '');
     setSlugManuallyEdited(true);
     setManualIsUrgent(!!art.isUrgent);
+    setManualContentFormat(art.contentFormat === 'blocks' ? 'blocks' : 'markdown');
+    setManualMetaDescription(art.metaDescription || '');
     setAdminTab('manual');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -483,6 +492,43 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  // Generate an interactive execution-guide article via Claude + web_search
+  const handleGenerateInteractiveArticle = async () => {
+    if (!interactiveTopic.trim()) return;
+    setGeneratingInteractive(true);
+    try {
+      const res = await fetch('/api/ai/generate-interactive-article', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ topic: interactiveTopic }),
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        setManualTitle(data.data.title || '');
+        setManualExcerpt(data.data.excerpt || '');
+        if (data.data.category) setManualCategory(data.data.category as ArticleCategory);
+        setManualKeywords(Array.isArray(data.data.seoKeywords) ? data.data.seoKeywords.join(', ') : '');
+        setManualMetaDescription(data.data.metaDescription || '');
+        setManualContent(JSON.stringify(data.data.blocks));
+        setManualContentFormat('blocks');
+        setAdminTab('manual');
+        setShowInteractivePrompt(false);
+        setInteractiveTopic('');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        alert(data.message || 'No se pudo generar la guía interactiva.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error al generar la guía interactiva.');
+    } finally {
+      setGeneratingInteractive(false);
+    }
+  };
+
   // Manual Article Submit (Create or Update)
   const handleManualArticleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -496,6 +542,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         title: manualTitle,
         excerpt: manualExcerpt || manualTitle,
         content: manualContent,
+        contentFormat: manualContentFormat,
         category: manualCategory,
         neighborhood: manualNeighborhood,
         imageUrl: manualImage || 'https://images.unsplash.com/photo-1588880331179-bc9b93a8cb5e?auto=format&fit=crop&w=1200&q=80',
@@ -512,7 +559,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         likesCount: existing ? existing.likesCount : 0,
         commentsCount: existing ? existing.commentsCount : 0,
         seoKeywords: String(manualKeywords || '').split(',').map((k) => k.trim()).filter(Boolean),
-        metaDescription: manualExcerpt,
+        metaDescription: manualMetaDescription || manualExcerpt,
         source: existing ? existing.source : 'Direct',
       };
 
@@ -529,6 +576,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setSlugManuallyEdited(false);
       setManualContent('');
       setManualKeywords('');
+      setManualContentFormat('markdown');
+      setManualMetaDescription('');
       alert('¡Artículo actualizado con éxito!');
     } else {
       const newArticle: Article = {
@@ -537,6 +586,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         title: manualTitle,
         excerpt: manualExcerpt || manualTitle,
         content: manualContent,
+        contentFormat: manualContentFormat,
         category: manualCategory,
         neighborhood: manualNeighborhood,
         imageUrl: manualImage || 'https://images.unsplash.com/photo-1588880331179-bc9b93a8cb5e?auto=format&fit=crop&w=1200&q=80',
@@ -553,7 +603,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         likesCount: 0,
         commentsCount: 0,
         seoKeywords: String(manualKeywords || '').split(',').map((k) => k.trim()).filter(Boolean),
-        metaDescription: manualExcerpt,
+        metaDescription: manualMetaDescription || manualExcerpt,
         source: 'Direct',
       };
 
@@ -564,6 +614,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setSlugManuallyEdited(false);
       setManualContent('');
       setManualKeywords('');
+      setManualContentFormat('markdown');
+      setManualMetaDescription('');
       alert('¡Artículo publicado con éxito!');
     }
   };
@@ -968,6 +1020,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   setManualExcerpt('');
                   setManualContent('');
                   setManualKeywords('');
+                  setManualContentFormat('markdown');
+                  setManualMetaDescription('');
                 }}
                 className="text-xs text-rose-600 underline font-bold"
               >
@@ -1085,19 +1139,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">Content:</label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setClaudeArticleError('');
-                    setShowClaudeTopicInput((v) => !v);
-                  }}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1 shadow-xs disabled:opacity-50"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Generar artículo con IA</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setClaudeArticleError('');
+                      setShowClaudeTopicInput((v) => !v);
+                    }}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1 shadow-xs disabled:opacity-50"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Generar artículo con IA</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowInteractivePrompt((v) => !v)}
+                    className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1 shadow-xs"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Generar guía interactiva con IA</span>
+                  </button>
+                </div>
               </div>
 
               {showClaudeTopicInput && (
@@ -1136,11 +1200,43 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               )}
 
+              {showInteractivePrompt && (
+                <div className="p-3 mb-2 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 space-y-2 animate-fade-in">
+                  <label className="block text-[11px] font-bold text-rose-800 dark:text-rose-300">
+                    Tema de la guía interactiva:
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={interactiveTopic}
+                      onChange={(e) => setInteractiveTopic(e.target.value)}
+                      placeholder="ej. Cómo desplegar un proyecto en Vercel"
+                      className="flex-1 bg-white dark:bg-slate-900 p-2.5 rounded-xl text-xs border border-rose-200 dark:border-rose-800 text-slate-900 dark:text-white"
+                      disabled={generatingInteractive}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleGenerateInteractiveArticle}
+                      disabled={generatingInteractive || !interactiveTopic.trim()}
+                      className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                    >
+                      {generatingInteractive ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                      <span>{generatingInteractive ? 'Investigando y generando...' : 'Generar'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {manualContentFormat === 'blocks' && (
+                <p className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold mb-1">
+                  Contenido en formato de bloques (JSON) — edítalo con cuidado o vuelve a generar.
+                </p>
+              )}
               <textarea
                 rows={5}
                 value={manualContent}
                 onChange={(e) => setManualContent(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-900 p-3 rounded-xl text-xs border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                className={`w-full bg-slate-50 dark:bg-slate-900 p-3 rounded-xl text-xs border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white ${manualContentFormat === 'blocks' ? 'font-mono' : ''}`}
                 required
               />
             </div>

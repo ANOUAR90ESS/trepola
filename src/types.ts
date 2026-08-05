@@ -21,6 +21,7 @@ export interface Article {
   title: string | { es: string; en: string; ar: string };
   excerpt: string | { es: string; en: string; ar: string };
   content: string | { es: string; en: string; ar: string };
+  contentFormat?: 'markdown' | 'blocks';
   category: ArticleCategory;
   neighborhood: string;
   cityId?: string;

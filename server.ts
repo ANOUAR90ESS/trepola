@@ -20,6 +20,7 @@ import sharp from 'sharp';
 import Parser from 'rss-parser';
 import { INITIAL_ARTICLES, INITIAL_COMMENTS } from './src/data/initialData.js';
 import { allCategoryPaths, pathToCategoryId } from './src/utils/categoryRoutes.js';
+import { BLOCK_TYPES } from './src/types/articleBlocks.js';
 
 const CATEGORY_NAMES_ES: Record<string, string> = {
   general: 'Noticias General',
@@ -170,7 +171,9 @@ function getGeminiAI() {
   }
 }
 
-// Helper: Anthropic (Claude) Client for the SEO article generator
+// Helper: Anthropic (Claude) Client — shared by the SEO article generator
+// (/api/generate-article) and the interactive execution-guide generator
+// (/api/ai/generate-interactive-article). No fallback provider for either.
 function getAnthropicClient() {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey || apiKey.includes('your-anthropic-api-key') || apiKey.length < 10) {
@@ -182,6 +185,38 @@ function getAnthropicClient() {
     console.warn('Anthropic client init notice:', e);
     return null;
   }
+}
+
+/**
+ * Extracts and validates an InteractiveArticleData JSON object from Claude's
+ * raw text response. Factored out as a pure function so it can be unit-tested
+ * with a hand-crafted/pasted response string without a live API call.
+ */
+function parseInteractiveArticleResponse(rawText: string): { title: string; excerpt: string; category?: string; seoKeywords?: string[]; metaDescription?: string; estimatedCompletionMinutes?: number; blocks: any[] } {
+  let cleaned = rawText.trim();
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch (e) {
+    throw new Error('AI returned invalid JSON');
+  }
+
+  if (!parsed || typeof parsed.title !== 'string' || !parsed.title.trim()) {
+    throw new Error('AI response is missing a valid title');
+  }
+  if (!Array.isArray(parsed.blocks) || parsed.blocks.length === 0) {
+    throw new Error('AI response is missing a non-empty blocks array');
+  }
+  const knownTypes: readonly string[] = BLOCK_TYPES;
+  for (const block of parsed.blocks) {
+    if (!block || typeof block.type !== 'string' || !knownTypes.includes(block.type)) {
+      throw new Error(`AI response contains an unknown block type: ${block?.type}`);
+    }
+  }
+
+  return parsed;
 }
 
 // Helper: Supabase Admin client (service role) for Storage uploads
@@ -440,7 +475,7 @@ Genera también:
 Devuelve ÚNICAMENTE un objeto JSON válido, sin texto antes ni después, sin backticks de markdown, con las claves: title, slug, metaDescription, content, category, keywords.`;
 
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-sonnet-5',
       max_tokens: 4000,
       thinking: { type: 'adaptive' },
       output_config: { effort: 'medium' },
@@ -680,6 +715,116 @@ app.post('/api/ai/generate-image', async (req, res) => {
   }
 });
 
+// 2b. AI Interactive Execution-Guide Generation Endpoint (Claude + web_search, admin-only)
+app.post('/api/ai/generate-interactive-article', requireAdmin, async (req, res) => {
+  try {
+    const { topic } = req.body;
+    if (!topic || typeof topic !== 'string' || !topic.trim()) {
+      return res.status(400).json({ success: false, message: 'Missing topic' });
+    }
+
+    const anthropic = getAnthropicClient();
+    if (!anthropic) {
+      return res.status(500).json({ success: false, message: 'La generación de guías interactivas no está configurada (falta ANTHROPIC_API_KEY).' });
+    }
+
+    const systemPrompt = `Eres el redactor jefe de Trepola, un sitio de noticias en español (audiencia mayoritariamente en España) que cubre tecnología (especialmente IA), deportes, política, economía y cultura.
+
+FILOSOFÍA EDITORIAL (no negociable): un artículo de Trepola nunca es un post de blog tradicional. Es una guía de ejecución interactiva. El objetivo de cada artículo es que el lector TERMINE algo, no que LEA algo. Al escribir cada sección, respóndete: ¿qué debe HACER el usuario?, ¿dónde hace CLIC?, ¿qué debe VER si lo hizo bien?, ¿qué error es probable que cometa y cómo lo soluciona?, ¿cómo verifica que lo logró?
+
+INVESTIGACIÓN OBLIGATORIA: antes de escribir la guía, investiga la herramienta o el tema exacto usando la búsqueda web disponible. No asumas ni inventes:
+- Si la herramienta tiene varios métodos/caminos reales para lograr el objetivo (ej. línea de comandos vs interfaz web, o dos productos distintos que compiten), identifica los métodos reales que existen y decide si el artículo debe cubrir uno, ambos como bloques "steps" separados, o presentarlos como un "decision-tree".
+- Usa los nombres reales y actuales de los botones, menús, comandos o campos de configuración tal como existen hoy en la herramienta — no los aproximes ni los inventes.
+- Si la herramienta requiere configuración adicional real más allá del flujo principal (variables de entorno, DNS, permisos, planes de precio, límites de uso), inclúyela como pasos o bloques "warning"/"tip" adicionales — no la omitas por simplificar.
+- Si la búsqueda no aporta información suficientemente concreta sobre un paso técnico específico, dilo explícitamente en el contenido en vez de inventar un paso plausible pero no verificado.
+
+Reglas de SEO (basadas en datos reales de rendimiento del sitio):
+- Nunca titules con términos genéricos y saturados ("últimas noticias de IA", "noticias de tecnología hoy"). Tienen posición media >70 en Google y cero clics.
+- Prioriza ángulos de cola larga: nombres concretos de herramientas/modelos, comparativas directas, guías prácticas, o el impacto local en España de una noticia global.
+- Si el tema es una herramienta de IA, incluye su nombre exacto en el título.
+- Los temas de regulación/privacidad/ciberseguridad deben tener enfoque práctico y accionable para empresas o usuarios españoles.
+
+Reglas de estructura (obligatorias):
+- El contenido se devuelve como un array "blocks", nunca como un único bloque de texto largo.
+- Tipos de bloque disponibles y su forma exacta (usa solo estos "type", con exactamente estas claves):
+  {"type":"paragraph","text":"string"}
+  {"type":"heading","text":"string","level":2}
+  {"type":"stat-card","title":"string","stats":[{"value":"string","label":"string"}]}
+  {"type":"comparison-table","title":"string","columns":["string","string"],"rows":[{"label":"string","values":["string","string"]}]}
+  {"type":"bar-chart","title":"string","source":"string opcional","bars":[{"label":"string","value":0-100,"displayValue":"string"}]}
+  {"type":"steps","title":"string","steps":[{"title":"string","body":"string"}]}
+  {"type":"ui-walkthrough","context":"string","callout":"string","explanation":"string","result":"string"}
+  {"type":"checklist","title":"string","items":["string"]}
+  {"type":"timeline","title":"string","events":[{"date":"string","text":"string"}]}
+  {"type":"warning","text":"string"}
+  {"type":"tip","text":"string"}
+  {"type":"verification-block","question":"string","expected":"string"}
+  {"type":"troubleshooting","title":"string","items":[{"problem":"string","solution":"string"}]}
+  {"type":"decision-tree","question":"string","branches":[{"condition":"string","outcome":"string"}]}
+  {"type":"quiz","question":"string","options":["string","string","string"],"correctIndex":0}
+  {"type":"practice-block","title":"string","instructions":"string"}
+- Reglas de selección de bloques según el tipo de contenido:
+  - Tutorial "cómo hacer X": estructura en "steps" + al menos 2-3 bloques "ui-walkthrough" (uno por acción de clic importante) + "checklist" final + "verification-block".
+  - Comparativa entre dos herramientas: "comparison-table" primero, seguido de "steps" separados para cada herramienta.
+  - Noticia regulatoria/legal: "stat-card" con fechas/cifras clave, "timeline" si hay varias fechas, "checklist" de qué hacer antes de la fecha límite.
+  - Artículo con datos/estadísticas: "bar-chart" en vez de enumerar cifras en texto.
+  - Cualquier paso con posibilidad real de error: bloque "troubleshooting" y/o "warning".
+  - Guías largas (>6 pasos): añade 1 "quiz" de una pregunta a mitad de artículo y un "practice-block" al final.
+- Un bloque "paragraph" nunca supera las 4-5 frases: si hace falta más espacio, es señal de que ese contenido debería ser otro tipo de bloque.
+- No inventes cifras ni datos no verificables.
+- Español de España, tono claro, directo, sin sensacionalismo.
+
+Devuelve ÚNICAMENTE un objeto JSON válido, sin texto antes ni después, sin backticks de markdown, con las claves: title, excerpt, category (una de: Tecnología, Deportes, Política, Economía, Cultura, General), seoKeywords (array de 3-5 strings), metaDescription (120-155 caracteres), estimatedCompletionMinutes (number), blocks (array).`;
+
+    const userPrompt = `Escribe una guía de ejecución interactiva sobre: ${topic}`;
+
+    let messages: Anthropic.MessageParam[] = [{ role: 'user', content: userPrompt }];
+    let response = await anthropic.messages.create({
+      model: 'claude-sonnet-5',
+      max_tokens: 8000,
+      system: systemPrompt,
+      tools: [{ type: 'web_search_20250305', name: 'web_search' } as any],
+      messages,
+    });
+
+    let continues = 0;
+    while (response.stop_reason === ('pause_turn' as any) && continues < 3) {
+      messages = [...messages, { role: 'assistant', content: response.content }];
+      response = await anthropic.messages.create({
+        model: 'claude-sonnet-5',
+        max_tokens: 8000,
+        system: systemPrompt,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' } as any],
+        messages,
+      });
+      continues++;
+    }
+
+    const rawText = response.content
+      .filter((block: any) => block.type === 'text')
+      .map((block: any) => block.text)
+      .join('');
+
+    if (!rawText.trim()) {
+      console.error('Interactive article generation: empty text response', JSON.stringify(response.content));
+      return res.status(500).json({ success: false, message: 'La IA no devolvió contenido de texto.' });
+    }
+
+    let data;
+    try {
+      data = parseInteractiveArticleResponse(rawText);
+    } catch (parseErr: any) {
+      console.error('Interactive article generation: parse/validation error:', parseErr?.message, '\nRaw text:', rawText);
+      return res.status(500).json({ success: false, message: 'La IA devolvió una respuesta con formato inválido. Inténtalo de nuevo.' });
+    }
+
+    return res.json({ success: true, data });
+  } catch (error: any) {
+    console.error('Interactive article generation error:', error);
+    return res.status(500).json({ success: false, message: 'No se pudo generar la guía interactiva. Inténtalo de nuevo.' });
+  }
+});
+
 // Admin Login Endpoint — issues a short-lived JWT after verifying server-side credentials
 app.post('/api/admin/login', async (req, res) => {
   try {
@@ -738,6 +883,7 @@ app.post('/api/articles', requireAdmin, async (req, res) => {
       title: titleStr,
       excerpt: typeof newArt.excerpt === 'object' ? (newArt.excerpt.es || newArt.excerpt.ar || newArt.excerpt.en || '') : String(newArt.excerpt),
       content: typeof newArt.content === 'object' ? (newArt.content.es || newArt.content.ar || newArt.content.en || '') : String(newArt.content),
+      contentFormat: newArt.contentFormat === 'blocks' ? 'blocks' : 'markdown',
       category: newArt.category || 'general',
       neighborhood: newArt.neighborhood || 'Centro',
       imageUrl: newArt.imageUrl || 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=700&q=70',

@@ -29,6 +29,8 @@ import { getOptimizedImageUrl, getSrcSet, getImageSizes } from '../utils/image';
 import { getSocialShareLinks } from '../utils/socialShare';
 import { getArticleUrl } from '../utils/slug';
 import { AdPlaceholder } from './AdPlaceholder';
+import { ArticleBlockRenderer } from './ArticleBlockRenderer';
+import type { ContentBlock } from '../types/articleBlocks';
 
 interface ArticleDetailModalProps {
   language: Language;
@@ -57,6 +59,19 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
   const title = getLocalizedField(article.title, language);
   const excerpt = getLocalizedField(article.excerpt, language);
   const content = getLocalizedField(article.content, language);
+
+  // Blocks-format articles (AI-generated interactive guides) are Spanish-only and
+  // not a per-language structure like the rest of the site — they render the same
+  // regardless of the active UI language (es/en/ar). Known limitation for now.
+  const isBlocksFormat = article.contentFormat === 'blocks';
+  const parsedBlocks = useMemo<ContentBlock[] | null>(() => {
+    if (!isBlocksFormat) return null;
+    try {
+      return JSON.parse(content) as ContentBlock[];
+    } catch {
+      return null;
+    }
+  }, [isBlocksFormat, content]);
 
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [fontSize, setFontSize] = useState<'normal' | 'large' | 'xlarge'>('normal');
@@ -164,10 +179,12 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
     }
   };
 
-  // Extract paragraphs for paragraph 3 AdSense insertion
+  // Extract paragraphs for paragraph 3 AdSense insertion (blocks-format articles
+  // don't use this legacy paragraph-split rendering path at all).
   const paragraphs = useMemo(() => {
+    if (isBlocksFormat) return [];
     return content.split('\n\n').filter(Boolean);
-  }, [content]);
+  }, [content, isBlocksFormat]);
 
   // Extract Table of Contents sections
   const tocSections = useMemo(() => {
@@ -345,18 +362,27 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
             </div>
           )}
 
-          {/* Main Article Body with AdSense Unit after Paragraph 3 */}
-          <div className={`text-slate-800 dark:text-slate-200 font-normal ${fontClasses[fontSize]} space-y-4`}>
-            {paragraphs.map((para, index) => (
-              <React.Fragment key={index}>
-                <p className="leading-relaxed">{para}</p>
-                {/* Paragraph 3 AdSense Placement */}
-                {index === 2 && (
-                  <AdPlaceholder language={language} format="in-article-p3" />
-                )}
-              </React.Fragment>
-            ))}
-          </div>
+          {/* Main Article Body: interactive block renderer for AI-generated guides, or the
+              legacy plain-paragraph body (with AdSense unit after paragraph 3) otherwise. */}
+          {isBlocksFormat ? (
+            parsedBlocks ? (
+              <ArticleBlockRenderer blocks={parsedBlocks} />
+            ) : (
+              <p className="text-sm text-rose-600 dark:text-rose-400">No se pudo cargar el contenido de este artículo.</p>
+            )
+          ) : (
+            <div className={`text-slate-800 dark:text-slate-200 font-normal ${fontClasses[fontSize]} space-y-4`}>
+              {paragraphs.map((para, index) => (
+                <React.Fragment key={index}>
+                  <p className="leading-relaxed">{para}</p>
+                  {/* Paragraph 3 AdSense Placement */}
+                  {index === 2 && (
+                    <AdPlaceholder language={language} format="in-article-p3" />
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          )}
 
           {/* Location Map Box */}
           {article.location && (
