@@ -326,6 +326,7 @@ export default function App() {
             title: art.title,
             excerpt: art.excerpt,
             content: art.content,
+            contentFormat: art.content_format === 'blocks' ? 'blocks' : 'markdown',
             category: art.category,
             neighborhood: art.neighborhood,
             imageUrl: art.image_url || 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=700&q=70',
