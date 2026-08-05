@@ -779,15 +779,18 @@ Devuelve ÚNICAMENTE un objeto JSON válido, sin texto antes ni después, sin ba
     const userPrompt = `Escribe una guía de ejecución interactiva sobre: ${topic}`;
 
     // NOTE: while running on Vercel Hobby (real function ceiling ~60s, vs. the
-    // Pro-tier maxDuration:300 configured in vercel.json), keep these conservative
-    // to fit in that window: capped web_search usage, smaller max_tokens, and a
-    // single pause_turn continuation at most. Loosen once upgraded to Pro.
+    // Pro-tier maxDuration:300 configured in vercel.json), cap web_search usage
+    // and pause_turn continuations to bound latency — but keep max_tokens generous:
+    // a low cap doesn't save time (the model still needs the tokens it needs), it
+    // just truncates the tool-use/search reasoning before the model ever reaches
+    // the final JSON text, guaranteeing a broken/empty response. Loosen the search
+    // cap and continuation bound once upgraded to Pro.
     const webSearchTool = { type: 'web_search_20250305', name: 'web_search', max_uses: 3 } as any;
 
     let messages: Anthropic.MessageParam[] = [{ role: 'user', content: userPrompt }];
     let response = await anthropic.messages.create({
       model: 'claude-sonnet-5',
-      max_tokens: 4000,
+      max_tokens: 8000,
       system: systemPrompt,
       tools: [webSearchTool],
       messages,
@@ -798,7 +801,7 @@ Devuelve ÚNICAMENTE un objeto JSON válido, sin texto antes ni después, sin ba
       messages = [...messages, { role: 'assistant', content: response.content }];
       response = await anthropic.messages.create({
         model: 'claude-sonnet-5',
-        max_tokens: 4000,
+        max_tokens: 8000,
         system: systemPrompt,
         tools: [webSearchTool],
         messages,
