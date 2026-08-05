@@ -791,8 +791,10 @@ Devuelve ÚNICAMENTE un objeto JSON válido, sin texto antes ni después, sin ba
 
     // Confirmed via production logs that maxDuration:300 is actually in effect
     // (function ran 1m41s of a 5m budget) — no need to artificially cap search
-    // usage or continuations to fit a shorter window.
-    const webSearchTool = { type: 'web_search_20250305', name: 'web_search' } as any;
+    // usage or continuations to fit a shorter window. max_uses is set generously
+    // (not tightly, which previously caused max_uses_exceeded mid-research) purely
+    // as a cost ceiling against a runaway/looping search sequence.
+    const webSearchTool = { type: 'web_search_20250305', name: 'web_search', max_uses: 8 } as any;
 
     let messages: Anthropic.MessageParam[] = [{ role: 'user', content: userPrompt }];
     let response = await anthropic.messages.create({
