@@ -25,6 +25,7 @@ import sharp from 'sharp';
 import Parser from 'rss-parser';
 import { INITIAL_ARTICLES, INITIAL_COMMENTS } from './src/data/initialData.js';
 import { allCategoryPaths, pathToCategoryId } from './src/utils/categoryRoutes.js';
+import { getSrcSet } from './src/utils/image.js';
 import { BLOCK_TYPES } from './src/types/articleBlocks.js';
 
 const CATEGORY_NAMES_ES: Record<string, string> = {
@@ -146,7 +147,7 @@ app.use(express.json({ limit: '10mb' }));
 
 // Enterprise Security Headers Middleware
 app.use((_req, res, next) => {
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.googleadservices.com https://*.adtrafficquality.google https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com https://news.google.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://*.tile.openstreetmap.org https://news.google.com https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.googleadservices.com https://*.adtrafficquality.google; connect-src 'self' https://*.supabase.co https://news.google.com https://news.google.com/rss/search https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.adtrafficquality.google https://*.googleadservices.com https://*.google-analytics.com https://*.analytics.google.com; frame-src 'self' https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.googleadservices.com https://*.adtrafficquality.google; frame-ancestors 'none';");
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.googleadservices.com https://*.adtrafficquality.google https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com https://news.google.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://*.tile.openstreetmap.org https://news.google.com https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.googleadservices.com https://*.adtrafficquality.google https://www.googletagmanager.com; connect-src 'self' https://*.supabase.co https://news.google.com https://news.google.com/rss/search https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.adtrafficquality.google https://*.googleadservices.com https://*.google-analytics.com https://*.analytics.google.com; frame-src 'self' https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.googleadservices.com https://*.adtrafficquality.google; frame-ancestors 'none';");
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -1608,6 +1609,22 @@ app.get('*', async (req, res, next) => {
       }
 
       const publishedDate = article.publishedAt || new Date().toISOString();
+
+      // index.html ships a static hero-image preload hint (a fixed Unsplash
+      // fallback photo) meant for whatever the default landing state is —
+      // on every article page it points at an image that page never uses,
+      // which is dead weight on the LCP-critical path (browser warns
+      // "preloaded ... but not used"). Replace it with this article's real
+      // image so the preload actually primes the hero photo that renders.
+      const heroSrc = article.imageUrl ? article.imageUrl.trim() : '';
+      let heroPreloadTag = '';
+      if (heroSrc.includes('images.unsplash.com')) {
+        const srcset = getSrcSet(heroSrc, [400, 640, 750, 828, 960, 1080, 1200], 60);
+        heroPreloadTag = `<link rel="preload" as="image" imagesrcset="${escapeHtml(srcset)}" imagesizes="(max-width: 1024px) 100vw, 66vw" fetchpriority="high" type="image/webp" />`;
+      } else if (heroSrc) {
+        heroPreloadTag = `<link rel="preload" as="image" href="${escapeHtml(heroSrc)}" fetchpriority="high" />`;
+      }
+      html = html.replace(/<link rel="preload" as="image"[\s\S]*?\/>/i, heroPreloadTag);
 
       // Interactive guides may carry a 'faq' block (see FaqBlock.tsx) —
       // surface it as FAQPage structured data for rich results.
