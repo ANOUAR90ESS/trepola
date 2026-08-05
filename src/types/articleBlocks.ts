@@ -93,10 +93,45 @@ export interface ParagraphBlock {
   text: string;
 }
 
+// Per-image generation metadata — one entry per generated version, so
+// regenerating a section image keeps history instead of destroying it.
+export interface GeneratedImageMetadata {
+  provider: string; // opaque id, e.g. 'openai' — never branched on by the UI
+  model?: string;
+  seed?: string | number;
+  width?: number;
+  height?: number;
+  style?: string;
+  promptUsed: string;
+  negativePromptUsed?: string;
+  // Open bag for provider-specific extras that don't warrant a typed field yet.
+  generationParams?: Record<string, unknown>;
+  version: number;
+  jobId: string;
+  createdAt: string;
+  url: string;
+}
+
+export interface SectionImage {
+  status: 'none' | 'prompt_ready' | 'generating' | 'ready' | 'failed';
+  prompt?: string;
+  negativePrompt?: string;
+  alt?: string;
+  caption?: string;
+  aspectRatio?: '16:9' | '1:1' | '4:5';
+  style?: string;
+  current?: GeneratedImageMetadata;
+  history?: GeneratedImageMetadata[];
+  error?: string;
+}
+
 export interface HeadingBlock {
   type: 'heading';
   text: string;
   level?: 2 | 3;
+  // Stable id used to target this section from image-generation jobs.
+  sectionId?: string;
+  image?: SectionImage;
 }
 
 export type ContentBlock =
@@ -144,4 +179,7 @@ export interface InteractiveArticleData {
   metaDescription?: string;
   estimatedCompletionMinutes?: number;
   blocks: ContentBlock[];
+  faq?: { question: string; answer: string }[];
+  internalLinkSuggestions?: { slug: string; anchorText: string }[];
+  heroImage?: SectionImage;
 }

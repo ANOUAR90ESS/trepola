@@ -7,9 +7,14 @@ import jwt from 'jsonwebtoken';
 
 import { requireAdmin, AuthRequest } from './src/middleware/auth.js';
 import { db } from './src/db/index.js';
-import { users, savedArticles, comments, articles as articlesTable } from './src/db/schema.js';
+import { users, savedArticles, comments, articles as articlesTable, jobs as jobsTable } from './src/db/schema.js';
 import { getOrCreateUser } from './src/db/users.js';
 import { eq, desc, and } from 'drizzle-orm';
+import { registerImageProvider } from './src/server/imageProviders/registry.js';
+import { OpenAIImageProvider } from './src/server/imageProviders/openaiProvider.js';
+import { registerJobHandler, getJobHandler } from './src/server/jobs/registry.js';
+import { createImageGenerationJobHandler } from './src/server/jobs/imageGenerationJob.js';
+import type { JobType } from './src/types/workflow.js';
 
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
@@ -297,6 +302,12 @@ async function uploadBase64ToStorage(b64: string): Promise<string | null> {
     return null;
   }
 }
+
+// Register AI providers/job handlers once at startup. Adding a new image
+// provider later means adding one adapter + one registerImageProvider call
+// here — nothing else in the request path changes.
+registerImageProvider(new OpenAIImageProvider(getOpenAIClient));
+registerJobHandler(createImageGenerationJobHandler(uploadBase64ToStorage));
 
 const parser = new Parser();
 
@@ -723,6 +734,92 @@ app.post('/api/ai/generate-image', async (req, res) => {
       imageUrl: `https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=700&q=70`,
       isFallback: true,
     });
+  }
+});
+
+// 4b. Generic AI Job endpoint (admin-only). Provider-agnostic: callers pass
+// a job `type` + `input`, never a provider name. Vercel has no persistent
+// worker, so the job runs synchronously within this request (confirmed safe
+// up to the ~300s maxDuration budget for image generation) — but it's
+// persisted as a uniform JobRecord, the same contract a real async queue
+// would use later without any caller-side changes.
+const KNOWN_JOB_TYPES: JobType[] = [
+  'image_generation',
+  'audio_generation',
+  'video_generation',
+  'translation',
+  'social_copy',
+  'newsletter_copy',
+];
+
+app.post('/api/jobs', requireAdmin, async (req, res) => {
+  try {
+    const { type, articleId, targetRef, input } = req.body || {};
+    if (!type || !KNOWN_JOB_TYPES.includes(type)) {
+      return res.status(400).json({ success: false, message: 'Missing or unknown job type' });
+    }
+    if (!input || typeof input !== 'object') {
+      return res.status(400).json({ success: false, message: 'Missing job input' });
+    }
+
+    const jobId = `job-${crypto.randomUUID()}`;
+    const now = new Date();
+    let status: 'succeeded' | 'failed' = 'succeeded';
+    let output: any = null;
+    let error: string | null = null;
+
+    try {
+      const handler = getJobHandler(type as JobType);
+      output = await handler.run(input, { articleId, targetRef });
+    } catch (err: any) {
+      status = 'failed';
+      error = err?.message || 'Job execution failed';
+    }
+
+    const jobRecord = {
+      id: jobId,
+      type,
+      status,
+      articleId: articleId || null,
+      targetRef: targetRef || null,
+      input,
+      output,
+      error,
+      attempts: 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    if (db) {
+      try {
+        await db.insert(jobsTable).values(jobRecord).onConflictDoNothing();
+      } catch (dbErr: any) {
+        console.error('Job persistence error (job still ran):', dbErr?.message || dbErr);
+      }
+    }
+
+    if (status === 'failed') {
+      return res.status(500).json({ success: false, message: error, job: jobRecord });
+    }
+    res.json({ success: true, job: jobRecord });
+  } catch (error: any) {
+    console.error('Job execution error:', error);
+    res.status(500).json({ success: false, message: 'No se pudo ejecutar la tarea.' });
+  }
+});
+
+app.get('/api/articles/:id/jobs', requireAdmin, async (req, res) => {
+  try {
+    if (!db) return res.json({ success: true, jobs: [] });
+    const list = await db
+      .select()
+      .from(jobsTable)
+      .where(eq(jobsTable.articleId, req.params.id))
+      .orderBy(desc(jobsTable.createdAt));
+    res.json({ success: true, jobs: list });
+  } catch (error: any) {
+    console.error('List jobs error:', error);
+    res.json({ success: true, jobs: [] });
   }
 });
 
