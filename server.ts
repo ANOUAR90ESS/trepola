@@ -36,6 +36,22 @@ const CATEGORY_NAMES_ES: Record<string, string> = {
   culture: 'Cultura y Arte',
 };
 
+function normalizeCategoryLabel(s: string): string {
+  return s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+}
+
+// Reverse lookup for CATEGORY_NAMES_ES, matched on the first word only so
+// Claude's shorter category labels ("Economía", "Cultura") still resolve to
+// the DB's category id ("economy", "culture") despite the longer display names.
+const CATEGORY_LABEL_TO_ID: Record<string, string> = Object.fromEntries(
+  Object.entries(CATEGORY_NAMES_ES).map(([id, label]) => [normalizeCategoryLabel(label.split(' ')[0]), id]),
+);
+
+function resolveCategoryId(claudeCategory?: string): string | undefined {
+  if (!claudeCategory) return undefined;
+  return CATEGORY_LABEL_TO_ID[normalizeCategoryLabel(claudeCategory.split(' ')[0])];
+}
+
 function serverSlugify(text: string): string {
   if (!text) return '';
   return text
@@ -277,6 +293,91 @@ function parseInteractiveArticleResponse(rawText: string): { title: string; exce
   }
 
   return parsed;
+}
+
+// faq/heading-image are optional, model-provided fields — sanitize leniently
+// (drop malformed entries) rather than failing the whole generation over them.
+function sanitizeFaq(raw: any): { question: string; answer: string }[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const cleaned = raw
+    .filter((f) => f && typeof f.question === 'string' && typeof f.answer === 'string' && f.question.trim() && f.answer.trim())
+    .map((f) => ({ question: f.question.trim(), answer: f.answer.trim() }));
+  return cleaned.length > 0 ? cleaned : undefined;
+}
+
+const VALID_ASPECT_RATIOS = ['16:9', '1:1', '4:5'];
+
+function sanitizeSectionImage(raw: any): Record<string, any> | undefined {
+  if (!raw || typeof raw !== 'object' || typeof raw.prompt !== 'string' || !raw.prompt.trim()) return undefined;
+  return {
+    status: 'prompt_ready',
+    prompt: raw.prompt.trim(),
+    negativePrompt: typeof raw.negativePrompt === 'string' ? raw.negativePrompt.trim() : undefined,
+    alt: typeof raw.alt === 'string' ? raw.alt.trim() : undefined,
+    caption: typeof raw.caption === 'string' ? raw.caption.trim() : undefined,
+    aspectRatio: VALID_ASPECT_RATIOS.includes(raw.aspectRatio) ? raw.aspectRatio : '16:9',
+    style: typeof raw.style === 'string' ? raw.style.trim() : undefined,
+  };
+}
+
+/**
+ * Deterministic post-processing on top of Claude's parsed output — no AI
+ * call. Assigns stable sectionIds to heading blocks (the model's job is
+ * deciding content, not bookkeeping) and sanitizes the optional faq/image
+ * fields it may have included per the system prompt.
+ */
+function postProcessInteractiveArticleData(data: any): any {
+  data.faq = sanitizeFaq(data.faq);
+  let sectionCounter = 0;
+  for (const block of data.blocks) {
+    if (block && block.type === 'heading') {
+      sectionCounter++;
+      block.sectionId = `section-${sectionCounter}`;
+      const sanitizedImage = sanitizeSectionImage(block.image);
+      if (sanitizedImage) {
+        block.image = sanitizedImage;
+      } else {
+        delete block.image;
+      }
+    }
+  }
+  return data;
+}
+
+/**
+ * Suggests up to 3 existing published articles to link to from a new one,
+ * scored by seoKeywords overlap within the same category. Pure DB read, no
+ * AI call — degrades to an empty list on any error or missing data rather
+ * than failing generation.
+ */
+async function computeInternalLinkSuggestions(article: { category?: string; seoKeywords?: string[] }): Promise<{ slug: string; anchorText: string }[]> {
+  const categoryId = resolveCategoryId(article.category);
+  const newKeywords = new Set((article.seoKeywords || []).map((k) => k.toLowerCase().trim()).filter(Boolean));
+  if (!db || !categoryId || newKeywords.size === 0) return [];
+
+  try {
+    const candidates = await db
+      .select({ slug: articlesTable.slug, title: articlesTable.title, seoKeywords: articlesTable.seoKeywords })
+      .from(articlesTable)
+      .where(eq(articlesTable.category, categoryId))
+      .orderBy(desc(articlesTable.publishedAt))
+      .limit(30);
+
+    return candidates
+      .filter((c) => !!c.slug)
+      .map((c) => ({
+        slug: c.slug as string,
+        anchorText: c.title,
+        overlap: (c.seoKeywords || []).filter((k) => newKeywords.has(k.toLowerCase().trim())).length,
+      }))
+      .filter((c) => c.overlap > 0)
+      .sort((a, b) => b.overlap - a.overlap)
+      .slice(0, 3)
+      .map(({ slug, anchorText }) => ({ slug, anchorText }));
+  } catch (e: any) {
+    console.warn('Internal link suggestion error:', e?.message || e);
+    return [];
+  }
 }
 
 // Helper: Supabase Admin client (service role) for Storage uploads
@@ -900,7 +1001,7 @@ Reglas de estructura (obligatorias):
 - El contenido se devuelve como un array "blocks", nunca como un único bloque de texto largo.
 - Tipos de bloque disponibles y su forma exacta (usa solo estos "type", con exactamente estas claves):
   {"type":"paragraph","text":"string"}
-  {"type":"heading","text":"string","level":2}
+  {"type":"heading","text":"string","level":2,"image":{opcional, ver "Reglas de imagen por sección"}}
   {"type":"stat-card","title":"string","stats":[{"value":"string","label":"string"}]}
   {"type":"comparison-table","title":"string","columns":["string","string"],"rows":[{"label":"string","values":["string","string"]}]}
   {"type":"bar-chart","title":"string","source":"string opcional","bars":[{"label":"string","value":0-100,"displayValue":"string"}]}
@@ -926,7 +1027,16 @@ Reglas de estructura (obligatorias):
 - No inventes cifras ni datos no verificables.
 - Español de España, tono claro, directo, sin sensacionalismo.
 
-Devuelve ÚNICAMENTE un objeto JSON válido, sin texto antes ni después, sin backticks de markdown, con las claves: title, excerpt, category (una de: Tecnología, Deportes, Política, Economía, Cultura, General), seoKeywords (array de 3-5 strings), metaDescription (120-155 caracteres), estimatedCompletionMinutes (number), blocks (array).`;
+Reglas de imagen por sección (opcional, campo "image" dentro de un bloque "heading"):
+- Añádelo solo cuando esa sección concreta se entienda mejor con un apoyo visual (un proceso, una comparación, un diagrama, un concepto abstracto) — no lo añadas por rutina a cada "heading". Mejor 2-3 imágenes bien elegidas en toda la guía que una por cada título.
+- Forma exacta: {"prompt":"string en INGLÉS, muy detallado y cinematográfico: sujeto, entorno, iluminación, composición, estilo","negativePrompt":"low quality, blurry, watermark, text, logo, distorted hands, cropped","alt":"string en español para accesibilidad","caption":"string opcional en español","aspectRatio":"16:9","style":"string, ej. Editorial Illustration / 3D render / Diagrama técnico"}
+- El prompt siempre en inglés (mejores resultados en modelos de imagen); alt y caption siempre en español.
+
+Reglas de FAQ (array "faq" de nivel superior, opcional):
+- Añade 3-5 preguntas frecuentes reales que un lector buscaría en Google sobre este tema exacto, con respuestas directas de 2-3 frases. Forma: [{"question":"string","answer":"string"}].
+- Omítelo solo si el tema es tan estrecho que no genera preguntas naturales de búsqueda.
+
+Devuelve ÚNICAMENTE un objeto JSON válido, sin texto antes ni después, sin backticks de markdown, con las claves: title, excerpt, category (una de: Tecnología, Deportes, Política, Economía, Cultura, General), seoKeywords (array de 3-5 strings), metaDescription (120-155 caracteres), estimatedCompletionMinutes (number), blocks (array), faq (array opcional, ver reglas de FAQ).`;
 
     const userPrompt = `Escribe una guía de ejecución interactiva sobre: ${topic}`;
 
@@ -991,7 +1101,11 @@ Devuelve ÚNICAMENTE un objeto JSON válido, sin texto antes ni después, sin ba
       return res.status(500).json({ success: false, message: 'La IA devolvió una respuesta con formato inválido. Inténtalo de nuevo.' });
     }
 
-    return res.json({ success: true, data });
+    data = postProcessInteractiveArticleData(data);
+    // Deterministic, no extra AI call — best-effort, degrades to [] silently.
+    const internalLinkSuggestions = await computeInternalLinkSuggestions(data);
+
+    return res.json({ success: true, data: { ...data, internalLinkSuggestions } });
   } catch (error: any) {
     console.error('Interactive article generation error:', error);
     return res.status(500).json({ success: false, message: 'No se pudo generar la guía interactiva. Inténtalo de nuevo.' });
