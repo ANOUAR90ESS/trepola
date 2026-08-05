@@ -26,6 +26,12 @@ export const articles = pgTable('articles', {
   title: text('title').notNull(),
   excerpt: text('excerpt').notNull(),
   content: text('content').notNull(),
+  // 'markdown' (default, plain-paragraph legacy content) | 'blocks' (content is a
+  // JSON-serialized ContentBlock[], see src/types/articleBlocks.ts). This column
+  // does not exist in the live DB yet — run the following manually in Supabase
+  // before deploying anything that writes 'blocks' articles:
+  //   ALTER TABLE articles ADD COLUMN content_format text DEFAULT 'markdown';
+  contentFormat: text('content_format').default('markdown'),
   category: text('category').notNull(),
   neighborhood: text('neighborhood').notNull(),
   imageUrl: text('image_url'),

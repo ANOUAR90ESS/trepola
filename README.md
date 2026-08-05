@@ -19,6 +19,9 @@ View your app in AI Studio: https://ai.studio/apps/a8106318-f278-4e30-9e7d-5db1e
 3. Run the app:
    `npm run dev`
 
-## AI Article Generator (Claude)
+## AI Article Generators (Claude)
 
-The admin panel's "Generar artículo con IA" button (manual article form) uses the Anthropic API to draft SEO-oriented articles. Set `ANTHROPIC_API_KEY` in Vercel → Project Settings → Environment Variables (Production and Preview). Use a key dedicated to this project — not your personal/general-purpose Anthropic Console key — since it's billed per request from the admin panel.
+The admin panel's manual article form has two Claude-powered generators, both requiring `ANTHROPIC_API_KEY` (set it in Vercel → Project Settings → Environment Variables for Production and Preview, or in `.env.local` for local dev — use a key dedicated to this project, not your personal Anthropic Console key). Neither has a fallback provider; both buttons fail without the key.
+
+- **"Generar artículo con IA"** — drafts a conventional SEO-oriented article (title/excerpt/content/keywords).
+- **"Generar guía interactiva con IA"** — researches the topic with Claude's web_search tool and returns a structured "execution guide" (steps, UI walkthroughs, checklists, quizzes, etc.) rendered by `ArticleBlockRenderer` instead of plain text.

@@ -1,6 +1,21 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Interactive article-guide design tokens (see DESIGN.md).
+   Scoped for use by src/components/blocks/* and blocks-format article
+   bodies only — site chrome keeps the Cairo/Tajawal body font below. */
+@theme {
+  --color-accent: #E11D3C;
+  --color-success: #0f8a4a;
+  --color-success-bg: #e8f7ee;
+  --color-warning: #a15c00;
+  --color-warning-bg: #fff4e0;
+  --color-info: #1656c9;
+  --color-info-bg: #eaf3ff;
+  --font-headline: 'Fraunces', serif;
+  --font-body: 'Public Sans', sans-serif;
+}
+
 @layer utilities {
   /* High Density Custom Scrollbar */
   .custom-scrollbar::-webkit-scrollbar {
