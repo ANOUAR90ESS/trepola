@@ -20,6 +20,8 @@ import { Language, UI_STRINGS } from '../i18n/translations';
 import { getLocalizedField } from '../utils/i18nHelpers';
 import { slugify } from '../utils/slug';
 import { useAuth } from '../lib/auth-context';
+import { SectionImageCard } from './SectionImageCard';
+import type { ContentBlock, HeadingBlock, SectionImage } from '../types/articleBlocks';
 
 interface AdminDashboardProps {
   language: Language;
@@ -109,6 +111,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [manualKeywords, setManualKeywords] = useState('noticias, ciudad, eventos');
   const [manualIsUrgent, setManualIsUrgent] = useState(false);
   const [manualContentFormat, setManualContentFormat] = useState<'markdown' | 'blocks'>('markdown');
+  // Client-generated id for a not-yet-published 'blocks' draft, so section
+  // image jobs (which may run before the article is ever saved) correlate
+  // with the article id it eventually gets on publish.
+  const [manualDraftId, setManualDraftId] = useState<string | null>(null);
+  const [sectionGeneratingId, setSectionGeneratingId] = useState<string | null>(null);
+  const [sectionErrors, setSectionErrors] = useState<Record<string, string>>({});
+  const [bulkGeneratingImages, setBulkGeneratingImages] = useState(false);
   const [manualMetaDescription, setManualMetaDescription] = useState('');
 
   // 4b. Interactive Execution-Guide Generator State (Claude + web_search)
@@ -514,6 +523,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         setManualMetaDescription(data.data.metaDescription || '');
         setManualContent(JSON.stringify(data.data.blocks));
         setManualContentFormat('blocks');
+        setManualDraftId(`art-${Date.now()}`);
+        setSectionErrors({});
         setAdminTab('manual');
         setShowInteractivePrompt(false);
         setInteractiveTopic('');
@@ -526,6 +537,119 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       alert('Error al generar la guía interactiva.');
     } finally {
       setGeneratingInteractive(false);
+    }
+  };
+
+  // ---- AI Content Studio: per-section image generation for 'blocks' articles ----
+
+  const manualParsedBlocks = useMemo<ContentBlock[] | null>(() => {
+    if (manualContentFormat !== 'blocks') return null;
+    try {
+      const parsed = JSON.parse(manualContent);
+      return Array.isArray(parsed) ? (parsed as ContentBlock[]) : null;
+    } catch {
+      return null;
+    }
+  }, [manualContentFormat, manualContent]);
+
+  const imageSections = useMemo(() => {
+    if (!manualParsedBlocks) return [];
+    return manualParsedBlocks.filter(
+      (block): block is HeadingBlock => block.type === 'heading' && !!block.sectionId && !!block.image,
+    );
+  }, [manualParsedBlocks]);
+
+  // Job for a not-yet-published draft correlates with manualDraftId; for an
+  // article already being edited, with its real persisted id.
+  const activeArticleIdForJobs = editingArticleId || manualDraftId || undefined;
+
+  // Functional update so sequential (bulk) generations never clobber each
+  // other via a stale manualContent closure — each call always reads the
+  // latest committed state, regardless of how many are queued in a row.
+  const updateSectionImage = (sectionId: string, image: SectionImage) => {
+    setManualContent((prevContent) => {
+      try {
+        const blocks = JSON.parse(prevContent);
+        if (!Array.isArray(blocks)) return prevContent;
+        const updated = blocks.map((block: any) =>
+          block?.type === 'heading' && block.sectionId === sectionId ? { ...block, image } : block,
+        );
+        return JSON.stringify(updated);
+      } catch {
+        return prevContent;
+      }
+    });
+  };
+
+  const generateSectionImage = async (sectionId: string, image: HeadingBlock['image'], promptOverride?: string) => {
+    if (!image) return;
+    setSectionGeneratingId(sectionId);
+    setSectionErrors((prev) => {
+      if (!(sectionId in prev)) return prev;
+      const next = { ...prev };
+      delete next[sectionId];
+      return next;
+    });
+    try {
+      const res = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          type: 'image_generation',
+          articleId: activeArticleIdForJobs,
+          targetRef: sectionId,
+          input: {
+            prompt: promptOverride ?? image.prompt,
+            negativePrompt: image.negativePrompt,
+            aspectRatio: image.aspectRatio || '16:9',
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!data.success || !data.job || data.job.status !== 'succeeded') {
+        throw new Error(data.message || 'No se pudo generar la imagen.');
+      }
+      const output = data.job.output || {};
+      const meta = {
+        provider: output.provider,
+        model: output.model,
+        seed: output.seed,
+        width: output.width,
+        height: output.height,
+        promptUsed: output.promptUsed,
+        negativePromptUsed: output.negativePromptUsed,
+        version: (image.history?.length || 0) + 1,
+        jobId: data.job.id,
+        createdAt: new Date().toISOString(),
+        url: output.url,
+      };
+      updateSectionImage(sectionId, {
+        ...image,
+        status: 'ready',
+        prompt: promptOverride ?? image.prompt,
+        current: meta,
+        history: [...(image.history || []), meta],
+      });
+    } catch (err: any) {
+      setSectionErrors((prev) => ({ ...prev, [sectionId]: err?.message || 'Error al generar la imagen.' }));
+    } finally {
+      setSectionGeneratingId(null);
+    }
+  };
+
+  const handleGenerateMissingImages = async () => {
+    setBulkGeneratingImages(true);
+    try {
+      for (const heading of imageSections) {
+        if (heading.image && heading.image.status !== 'ready' && heading.sectionId) {
+          await generateSectionImage(heading.sectionId, heading.image);
+        }
+      }
+    } finally {
+      setBulkGeneratingImages(false);
     }
   };
 
@@ -578,10 +702,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setManualKeywords('');
       setManualContentFormat('markdown');
       setManualMetaDescription('');
+      setManualDraftId(null);
+      setSectionErrors({});
       alert('¡Artículo actualizado con éxito!');
     } else {
       const newArticle: Article = {
-        id: `art-${Date.now()}`,
+        id: manualDraftId || `art-${Date.now()}`,
         slug: slugify(manualSlug) || slugify(manualTitle) || undefined,
         title: manualTitle,
         excerpt: manualExcerpt || manualTitle,
@@ -616,6 +742,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setManualKeywords('');
       setManualContentFormat('markdown');
       setManualMetaDescription('');
+      setManualDraftId(null);
+      setSectionErrors({});
       alert('¡Artículo publicado con éxito!');
     }
   };
@@ -1239,6 +1367,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 className={`w-full bg-slate-50 dark:bg-slate-900 p-3 rounded-xl text-xs border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white ${manualContentFormat === 'blocks' ? 'font-mono' : ''}`}
                 required
               />
+
+              {imageSections.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 space-y-3">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      Imágenes de sección ({imageSections.filter((h) => h.image?.status === 'ready').length}/{imageSections.length} listas)
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={handleGenerateMissingImages}
+                      disabled={bulkGeneratingImages || !!sectionGeneratingId || imageSections.every((h) => h.image?.status === 'ready')}
+                      className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-[11px] px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      {bulkGeneratingImages ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImageIcon className="w-3.5 h-3.5" />}
+                      <span>Generar imágenes pendientes</span>
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {imageSections.map((heading) => (
+                      <SectionImageCard
+                        key={heading.sectionId}
+                        heading={heading.text}
+                        image={heading.image!}
+                        generating={sectionGeneratingId === heading.sectionId}
+                        error={sectionErrors[heading.sectionId!] || null}
+                        onGenerate={(promptOverride) => generateSectionImage(heading.sectionId!, heading.image, promptOverride)}
+                        onSavePrompt={(prompt) => updateSectionImage(heading.sectionId!, { ...heading.image!, prompt })}
+                        onClear={() => updateSectionImage(heading.sectionId!, { ...heading.image!, status: 'prompt_ready', current: undefined })}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
