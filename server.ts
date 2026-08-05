@@ -796,10 +796,20 @@ Devuelve ÚNICAMENTE un objeto JSON válido, sin texto antes ni después, sin ba
     // as a cost ceiling against a runaway/looping search sequence.
     const webSearchTool = { type: 'web_search_20250305', name: 'web_search', max_uses: 8 } as any;
 
+    // claude-sonnet-5 runs adaptive thinking by default even with no `thinking`
+    // param set — those tokens come out of max_tokens same as visible output.
+    // Pinning effort to medium (like the classic /api/generate-article endpoint)
+    // keeps thinking spend bounded, and max_tokens is raised well above the
+    // classic endpoint's 4000 because this guide's JSON (many block types,
+    // several sections) is much larger than a plain article — without enough
+    // headroom the model can exhaust the budget on thinking + search narration
+    // before ever writing the final JSON text block ("no devolvió contenido de texto").
     let messages: Anthropic.MessageParam[] = [{ role: 'user', content: userPrompt }];
     let response = await anthropic.messages.create({
       model: 'claude-sonnet-5',
-      max_tokens: 8000,
+      max_tokens: 16000,
+      thinking: { type: 'adaptive' },
+      output_config: { effort: 'medium' },
       system: systemPrompt,
       tools: [webSearchTool],
       messages,
@@ -810,7 +820,9 @@ Devuelve ÚNICAMENTE un objeto JSON válido, sin texto antes ni después, sin ba
       messages = [...messages, { role: 'assistant', content: response.content }];
       response = await anthropic.messages.create({
         model: 'claude-sonnet-5',
-        max_tokens: 8000,
+        max_tokens: 16000,
+        thinking: { type: 'adaptive' },
+        output_config: { effort: 'medium' },
         system: systemPrompt,
         tools: [webSearchTool],
         messages,
