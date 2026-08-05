@@ -200,7 +200,18 @@ function parseInteractiveArticleResponse(rawText: string): { title: string; exce
   try {
     parsed = JSON.parse(cleaned);
   } catch (e) {
-    throw new Error('AI returned invalid JSON');
+    // Fallback: the model may have left a stray sentence before/after the JSON
+    // despite instructions not to — extract the outermost {...} block and retry.
+    const start = cleaned.indexOf('{');
+    const end = cleaned.lastIndexOf('}');
+    if (start === -1 || end === -1 || end <= start) {
+      throw new Error('AI returned invalid JSON');
+    }
+    try {
+      parsed = JSON.parse(cleaned.slice(start, end + 1));
+    } catch (e2) {
+      throw new Error('AI returned invalid JSON');
+    }
   }
 
   if (!parsed || typeof parsed.title !== 'string' || !parsed.title.trim()) {
@@ -778,14 +789,10 @@ Devuelve ÚNICAMENTE un objeto JSON válido, sin texto antes ni después, sin ba
 
     const userPrompt = `Escribe una guía de ejecución interactiva sobre: ${topic}`;
 
-    // NOTE: while running on Vercel Hobby (real function ceiling ~60s, vs. the
-    // Pro-tier maxDuration:300 configured in vercel.json), cap web_search usage
-    // and pause_turn continuations to bound latency — but keep max_tokens generous:
-    // a low cap doesn't save time (the model still needs the tokens it needs), it
-    // just truncates the tool-use/search reasoning before the model ever reaches
-    // the final JSON text, guaranteeing a broken/empty response. Loosen the search
-    // cap and continuation bound once upgraded to Pro.
-    const webSearchTool = { type: 'web_search_20250305', name: 'web_search', max_uses: 3 } as any;
+    // Confirmed via production logs that maxDuration:300 is actually in effect
+    // (function ran 1m41s of a 5m budget) — no need to artificially cap search
+    // usage or continuations to fit a shorter window.
+    const webSearchTool = { type: 'web_search_20250305', name: 'web_search' } as any;
 
     let messages: Anthropic.MessageParam[] = [{ role: 'user', content: userPrompt }];
     let response = await anthropic.messages.create({
@@ -797,7 +804,7 @@ Devuelve ÚNICAMENTE un objeto JSON válido, sin texto antes ni después, sin ba
     });
 
     let continues = 0;
-    while (response.stop_reason === ('pause_turn' as any) && continues < 1) {
+    while (response.stop_reason === ('pause_turn' as any) && continues < 3) {
       messages = [...messages, { role: 'assistant', content: response.content }];
       response = await anthropic.messages.create({
         model: 'claude-sonnet-5',
@@ -809,10 +816,12 @@ Devuelve ÚNICAMENTE un objeto JSON válido, sin texto antes ni después, sin ba
       continues++;
     }
 
-    const rawText = response.content
-      .filter((block: any) => block.type === 'text')
-      .map((block: any) => block.text)
-      .join('');
+    // Use only the LAST text block, not all of them joined: when the model uses
+    // web_search it commonly emits narration text blocks ("Voy a buscar...")
+    // interleaved with tool_use/tool_result blocks before the real final answer.
+    // Joining every text block corrupts the JSON (narration glued to the object).
+    const textBlocks = response.content.filter((block: any) => block.type === 'text') as any[];
+    const rawText = textBlocks.length > 0 ? textBlocks[textBlocks.length - 1].text : '';
 
     if (!rawText.trim()) {
       console.error('Interactive article generation: empty text response', JSON.stringify(response.content));
