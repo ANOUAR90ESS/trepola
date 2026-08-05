@@ -1063,6 +1063,19 @@ Devuelve ÚNICAMENTE un objeto JSON válido, sin texto antes ni después, sin ba
     // several sections) is much larger than a plain article — without enough
     // headroom the model can exhaust the budget on thinking + search narration
     // before ever writing the final JSON text block ("no devolvió contenido de texto").
+    // Concatenates every 'text' block in a response, in order. When the model
+    // uses web_search/thinking, a single response can legitimately contain
+    // several text blocks (interleaved thinking can split one continuous
+    // answer into two text segments — not just narration-then-answer), and a
+    // pause_turn continuation resumes generation mid-stream rather than
+    // restarting it. Taking only the LAST block (the previous fix) silently
+    // drops everything generated before that split, which surfaced as JSON
+    // missing its opening portion. Any leading narration this reintroduces
+    // is stripped by parseInteractiveArticleResponse's brace-extraction
+    // fallback below, so this is safe on both fronts.
+    const collectText = (resp: any): string =>
+      resp.content.filter((block: any) => block.type === 'text').map((block: any) => block.text).join('');
+
     let messages: Anthropic.MessageParam[] = [{ role: 'user', content: userPrompt }];
     let response = await anthropic.messages.create({
       model: 'claude-sonnet-5',
@@ -1073,6 +1086,7 @@ Devuelve ÚNICAMENTE un objeto JSON válido, sin texto antes ni después, sin ba
       tools: [webSearchTool],
       messages,
     });
+    let rawText = collectText(response);
 
     let continues = 0;
     while (response.stop_reason === ('pause_turn' as any) && continues < 3) {
@@ -1086,15 +1100,9 @@ Devuelve ÚNICAMENTE un objeto JSON válido, sin texto antes ni después, sin ba
         tools: [webSearchTool],
         messages,
       });
+      rawText += collectText(response);
       continues++;
     }
-
-    // Use only the LAST text block, not all of them joined: when the model uses
-    // web_search it commonly emits narration text blocks ("Voy a buscar...")
-    // interleaved with tool_use/tool_result blocks before the real final answer.
-    // Joining every text block corrupts the JSON (narration glued to the object).
-    const textBlocks = response.content.filter((block: any) => block.type === 'text') as any[];
-    const rawText = textBlocks.length > 0 ? textBlocks[textBlocks.length - 1].text : '';
 
     if (!rawText.trim()) {
       console.error('Interactive article generation: empty text response', JSON.stringify(response.content));
