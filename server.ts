@@ -1036,9 +1036,15 @@ Reglas de estructura (obligatorias):
 - No inventes cifras ni datos no verificables.
 - Español de España, tono claro, directo, sin sensacionalismo.
 
-Reglas de imagen por sección (opcional, campo "image" dentro de un bloque "heading"):
-- Añádelo solo cuando esa sección concreta se entienda mejor con un apoyo visual (un proceso, una comparación, un diagrama, un concepto abstracto) — no lo añadas por rutina a cada "heading". Mejor 2-3 imágenes bien elegidas en toda la guía que una por cada título.
-- Forma exacta: {"prompt":"string en INGLÉS, muy detallado y cinematográfico: sujeto, entorno, iluminación, composición, estilo","negativePrompt":"low quality, blurry, watermark, text, logo, distorted hands, cropped","alt":"string en español para accesibilidad","caption":"string opcional en español","aspectRatio":"16:9","style":"string, ej. Editorial Illustration / 3D render / Diagrama técnico"}
+Reglas de imagen por sección (campo "image" dentro de un bloque "heading"):
+- Objetivo: aproximadamente una imagen cada 2-3 secciones ("heading"), para que la guía nunca se sienta como un muro de texto. No hace falta en cada "heading", pero para una guía de 6 o más secciones incluye al menos 3-4 imágenes repartidas a lo largo del contenido, no todas al principio.
+- Varía el tipo de apoyo visual según lo que esa sección explica — no repitas siempre el mismo estilo:
+  - Proceso o pasos → diagrama de flujo o ilustración paso a paso.
+  - Comparación entre opciones/herramientas → infografía o gráfico comparativo.
+  - Interfaz, producto o herramienta real → estilo fotográfico realista tipo "product shot".
+  - Concepto abstracto (seguridad, dinero, tiempo, IA) → ilustración editorial o icono conceptual grande y simple.
+  - Arquitectura técnica o flujo de datos → diagrama tipo blueprint/esquema técnico.
+- Forma exacta: {"prompt":"string en INGLÉS, muy detallado y cinematográfico: sujeto, entorno, iluminación, composición, estilo","negativePrompt":"low quality, blurry, watermark, text, logo, distorted hands, cropped","alt":"string en español para accesibilidad","caption":"string opcional en español","aspectRatio":"16:9","style":"string, ej. Editorial Illustration / 3D render / Diagrama técnico / Icono conceptual / Infografía comparativa"}
 - El prompt siempre en inglés (mejores resultados en modelos de imagen); alt y caption siempre en español.
 
 Reglas de FAQ (array "faq" de nivel superior, opcional):
