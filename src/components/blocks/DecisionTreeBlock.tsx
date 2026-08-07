@@ -7,12 +7,12 @@ export const DecisionTreeBlock: React.FC<{ block: DecisionTreeBlockType }> = ({ 
     <h4 className="font-headline font-black text-base text-[#101418] dark:text-white mb-4">{block.question}</h4>
     <div className="space-y-3">
       {block.branches.map((branch, i) => (
-        <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800">
-          <span className="font-body text-xs font-bold px-2.5 py-1 rounded-md bg-accent text-white flex-shrink-0">
-            {branch.condition}
-          </span>
-          <ArrowRight className="w-4 h-4 text-[#5b6470] flex-shrink-0" aria-hidden="true" />
-          <span className="font-body text-sm text-[#101418] dark:text-slate-200">{branch.outcome}</span>
+        <div key={i} className="rounded-lg bg-slate-50 dark:bg-slate-800 border-l-4 border-accent p-4 space-y-2">
+          <p className="font-body text-sm font-bold text-[#101418] dark:text-white">{branch.condition}</p>
+          <div className="flex items-start gap-2 pl-1">
+            <ArrowRight className="w-4 h-4 text-accent flex-shrink-0 mt-0.5" aria-hidden="true" />
+            <p className="font-body text-sm text-[#5b6470] dark:text-slate-300">{branch.outcome}</p>
+          </div>
         </div>
       ))}
     </div>
