@@ -322,12 +322,39 @@ function sanitizeSectionImage(raw: any): Record<string, any> | undefined {
 }
 
 /**
+ * Claude sometimes writes inline pseudo-citation markup while grounding on
+ * web_search results (e.g. <cite index="10-12,10-13">...</cite>) even
+ * though nothing in the prompt asks for it — this isn't the API's separate
+ * structured `citations` field, just literal text landing inside a block's
+ * "text"/"body"/etc. Recursively strips it from every string value so it
+ * can never surface verbatim, regardless of which field it shows up in.
+ */
+function stripInlineCitationTags(value: any): any {
+  if (typeof value === 'string') {
+    const stripped = value.replace(/<\/?cite\b[^>]*>/gi, '');
+    return stripped === value ? value : stripped.replace(/\s{2,}/g, ' ').trim();
+  }
+  if (Array.isArray(value)) {
+    return value.map(stripInlineCitationTags);
+  }
+  if (value && typeof value === 'object') {
+    const result: any = {};
+    for (const key of Object.keys(value)) {
+      result[key] = stripInlineCitationTags(value[key]);
+    }
+    return result;
+  }
+  return value;
+}
+
+/**
  * Deterministic post-processing on top of Claude's parsed output — no AI
  * call. Assigns stable sectionIds to heading blocks (the model's job is
  * deciding content, not bookkeeping) and sanitizes the optional faq/image
  * fields it may have included per the system prompt.
  */
 function postProcessInteractiveArticleData(data: any): any {
+  data = stripInlineCitationTags(data);
   data.faq = sanitizeFaq(data.faq);
   let sectionCounter = 0;
   for (const block of data.blocks) {
@@ -1034,6 +1061,7 @@ Reglas de estructura (obligatorias):
   - Guías largas (>6 pasos): añade 1 "quiz" de una pregunta a mitad de artículo y un "practice-block" al final.
 - Un bloque "paragraph" nunca supera las 4-5 frases: si hace falta más espacio, es señal de que ese contenido debería ser otro tipo de bloque.
 - No inventes cifras ni datos no verificables.
+- Nunca incluyas marcas de cita en el texto (nada de "<cite index=\"...\">...</cite>", "[1]", corchetes con números de fuente, ni ningún otro marcador de referencia). Escribe prosa limpia; si necesitas apoyarte en lo que encontraste en la búsqueda, intégralo de forma natural en la frase, sin etiquetas.
 - Español de España, tono claro, directo, sin sensacionalismo.
 
 Reglas de imagen por sección (campo "image" dentro de un bloque "heading"):
