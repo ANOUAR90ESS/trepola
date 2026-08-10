@@ -1785,7 +1785,10 @@ app.get('*', async (req, res, next) => {
         .replace(/<meta property="twitter:image" content=".*?"\s*\/?>/gi, `<meta property="twitter:image" content="${escapeHtml(ogImageUrl)}" />`)
         .replace(/<link rel="canonical" href=".*?"\s*\/?>/gi, `<link rel="canonical" href="${escapeHtml(canonicalUrl)}" />`);
 
-      html = html.replace('</head>', `<script id="dynamic-jsonld-schema" type="application/ld+json">${JSON.stringify(jsonLd)}</script></head>`);
+      // data-ssr marks this as server-rendered so the client-side SEOHead
+      // effect leaves it alone — it used to delete this exact node on every
+      // article page load (see SEOHead.tsx for the full explanation).
+      html = html.replace('</head>', `<script id="dynamic-jsonld-schema" type="application/ld+json" data-ssr="1">${JSON.stringify(jsonLd)}</script></head>`);
     }
   }
 

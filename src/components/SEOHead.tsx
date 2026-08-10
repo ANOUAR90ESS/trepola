@@ -152,7 +152,18 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
     }
 
     // Inject Dynamic JSON-LD Schema Script
+    // On /news/:slug the server already injected richer structured data
+    // (NewsArticle + BreadcrumbList + FAQPage, multiple image aspect ratios)
+    // into the HTML, tagged data-ssr. This effect runs before the article
+    // list finishes loading from the API, so `jsonLd` is still null on that
+    // first pass — the previous code therefore *deleted* the server's schema
+    // on every article page load, then replaced it with a poorer client-side
+    // version. Never touch a server-rendered node: it is both more complete
+    // and already present in the HTML Google receives.
     let schemaScript = document.getElementById('dynamic-jsonld-schema');
+    if (schemaScript?.hasAttribute('data-ssr')) {
+      return;
+    }
     if (jsonLd) {
       if (!schemaScript) {
         schemaScript = document.createElement('script');
