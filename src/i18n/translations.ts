@@ -275,7 +275,10 @@ export const UI_STRINGS = {
   },
 
   ar: {
-    appName: 'نبض الإخبارية',
+    // Brand name stays "Trepola" in every language — translating it would give
+    // Google two different brand names for one domain, which is exactly what
+    // weakens the name↔site association we're trying to build.
+    appName: 'Trepola',
     tagline: 'موقع إخباري شامل: تكنولوجيا، رياضة، سياسة، اقتصاد وأخبار عامة',
     badgeText: 'تغطية إخبارية على مدار الساعة',
     liveCoverage: 'عاجل ورئيسي',
