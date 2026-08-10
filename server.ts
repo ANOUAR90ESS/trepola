@@ -1648,6 +1648,32 @@ app.get('*', async (req, res, next) => {
 
       const publishedDate = article.publishedAt || new Date().toISOString();
 
+      // og:image:type was hardcoded to image/jpeg, but AI-generated hero images
+      // are stored as .webp in Supabase Storage — declaring the wrong MIME type
+      // breaks link previews on WhatsApp/Facebook. Derive it from the actual URL.
+      const isUnsplashOg = ogImageUrl.includes('images.unsplash.com');
+      const ogImageType = /\.webp(\?|$)/i.test(ogImageUrl)
+        ? 'image/webp'
+        : /\.png(\?|$)/i.test(ogImageUrl)
+        ? 'image/png'
+        : 'image/jpeg';
+
+      // Google (unlike social crawlers) takes article thumbnails from the
+      // structured data `image`, not from og:image. Its Article guidance asks
+      // for several aspect ratios (16x9 / 4x3 / 1x1), min 1200px wide. Unsplash
+      // can crop on the fly via URL params, so emit all three there; a
+      // Storage-hosted image has no resize API, so it stays a single entry.
+      const schemaImages = isUnsplashOg
+        ? (() => {
+            const base = ogImageUrl.split('?')[0];
+            return [
+              `${base}?auto=format&fit=crop&w=1200&h=675&q=85`,
+              `${base}?auto=format&fit=crop&w=1200&h=900&q=85`,
+              `${base}?auto=format&fit=crop&w=1200&h=1200&q=85`,
+            ];
+          })()
+        : [ogImageUrl];
+
       // index.html ships a static hero-image preload hint (a fixed Unsplash
       // fallback photo) meant for whatever the default landing state is —
       // on every article page it points at an image that page never uses,
@@ -1699,7 +1725,7 @@ app.get('*', async (req, res, next) => {
             'headline': artTitle,
             'description': metaDesc,
             'mainEntityOfPage': { '@type': 'WebPage', '@id': canonicalUrl },
-            'image': [ogImageUrl],
+            'image': schemaImages,
             'datePublished': publishedDate,
             'dateModified': publishedDate,
             'author': {
@@ -1744,9 +1770,13 @@ app.get('*', async (req, res, next) => {
         .replace(/<meta property="og:description" content=".*?"\s*\/?>/gi, `<meta property="og:description" content="${escapeHtml(metaDesc)}" />`)
         .replace(/<meta property="og:image" content=".*?"\s*\/?>/gi, `<meta property="og:image" content="${escapeHtml(ogImageUrl)}" />`)
         .replace(/<meta property="og:image:secure_url" content=".*?"\s*\/?>/gi, `<meta property="og:image:secure_url" content="${escapeHtml(ogImageUrl)}" />`)
-        .replace(/<meta property="og:image:type" content=".*?"\s*\/?>/gi, `<meta property="og:image:type" content="image/jpeg" />`)
-        .replace(/<meta property="og:image:width" content=".*?"\s*\/?>/gi, `<meta property="og:image:width" content="1200" />`)
-        .replace(/<meta property="og:image:height" content=".*?"\s*\/?>/gi, `<meta property="og:image:height" content="630" />`)
+        .replace(/<meta property="og:image:type" content=".*?"\s*\/?>/gi, `<meta property="og:image:type" content="${ogImageType}" />`)
+        // Only Unsplash images are force-cropped to a known 1200x630 above; a
+        // Storage-hosted image keeps whatever dimensions the generator produced,
+        // so drop the tags rather than assert a size we can't verify — crawlers
+        // fall back to reading the real dimensions from the image itself.
+        .replace(/<meta property="og:image:width" content=".*?"\s*\/?>/gi, isUnsplashOg ? `<meta property="og:image:width" content="1200" />` : '')
+        .replace(/<meta property="og:image:height" content=".*?"\s*\/?>/gi, isUnsplashOg ? `<meta property="og:image:height" content="630" />` : '')
         .replace(/<meta property="og:url" content=".*?"\s*\/?>/gi, `<meta property="og:url" content="${escapeHtml(canonicalUrl)}" />`)
         .replace(/<meta name="twitter:card" content=".*?"\s*\/?>/gi, `<meta name="twitter:card" content="summary_large_image" />`)
         .replace(/<meta property="twitter:card" content=".*?"\s*\/?>/gi, `<meta property="twitter:card" content="summary_large_image" />`)
