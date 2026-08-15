@@ -419,6 +419,7 @@ export default function App() {
         activeTab={activeTab}
         selectedCategory={selectedCategory}
         selectedArticle={selectedArticle}
+        activeFooterPage={activeFooterPage}
       />
       {/* Main Header & Navbar */}
       <Navbar

@@ -1594,16 +1594,52 @@ app.get('*', async (req, res, next) => {
   let html = fs.readFileSync(indexPath, 'utf-8');
   const baseUrl = process.env.VITE_SITE_URL || 'https://www.trepola.com';
 
-  // Intercept /terms, /privacy
+  // Intercept the footer pages. All six already route client-side (see
+  // parseUrlRoute in App.tsx, which opens the matching modal), but only
+  // /terms and /privacy used to get server-side metadata — the rest
+  // inherited the home page's title and canonical, so Google saw four
+  // duplicates of the home page instead of four distinct pages. AdSense
+  // reviewers also look for reachable About/Contact/Privacy pages.
+  const FOOTER_PAGES: Record<string, { title: string; description: string }> = {
+    '/about': {
+      title: 'Sobre Trepola | Quiénes somos',
+      description: 'Conoce Trepola: nuestra misión, nuestra visión y cómo cubrimos la actualidad en tecnología, IA, deportes, economía y cultura.',
+    },
+    '/contact': {
+      title: 'Contacto | Trepola',
+      description: 'Ponte en contacto con el equipo de Trepola para consultas editoriales, correcciones, colaboraciones o cuestiones de publicidad.',
+    },
+    '/privacy': {
+      title: 'Política de Privacidad | Trepola',
+      description: 'Cómo Trepola recoge, usa y protege tus datos personales, incluidas cookies, analítica y servicios publicitarios de terceros.',
+    },
+    '/terms': {
+      title: 'Términos de Servicio | Trepola',
+      description: 'Condiciones de uso de Trepola: derechos, responsabilidades, propiedad intelectual y normas de acceso al sitio.',
+    },
+    '/cookie': {
+      title: 'Política de Cookies | Trepola',
+      description: 'Qué cookies utiliza Trepola, para qué sirven y cómo puedes gestionarlas o desactivarlas desde tu navegador.',
+    },
+    '/security': {
+      title: 'Seguridad | Trepola',
+      description: 'Medidas de seguridad de Trepola para proteger la información de los usuarios y la integridad del sitio.',
+    },
+  };
+
   const cleanPath = req.path.replace(/^\/api/, '');
-  if (cleanPath === '/terms') {
+  const footerPage = FOOTER_PAGES[cleanPath.toLowerCase().replace(/\/+$/, '') || '/'];
+  if (footerPage) {
+    const pageCanonical = `${baseUrl}${cleanPath.toLowerCase().replace(/\/+$/, '')}`;
     html = html
-      .replace(/<title>.*?<\/title>/gi, `<title>Términos de Servicio | Trepola</title>`)
-      .replace(/<link rel="canonical" href=".*?"\s*\/?>/gi, `<link rel="canonical" href="${baseUrl}/terms" />`);
-  } else if (cleanPath === '/privacy') {
-    html = html
-      .replace(/<title>.*?<\/title>/gi, `<title>Política de Privacidad | Trepola</title>`)
-      .replace(/<link rel="canonical" href=".*?"\s*\/?>/gi, `<link rel="canonical" href="${baseUrl}/privacy" />`);
+      .replace(/<title>.*?<\/title>/gi, `<title>${escapeHtml(footerPage.title)}</title>`)
+      .replace(/<meta name="description" content=".*?"\s*\/?>/gi, `<meta name="description" content="${escapeHtml(footerPage.description)}" />`)
+      .replace(/<meta property="og:title" content=".*?"\s*\/?>/gi, `<meta property="og:title" content="${escapeHtml(footerPage.title)}" />`)
+      .replace(/<meta property="og:description" content=".*?"\s*\/?>/gi, `<meta property="og:description" content="${escapeHtml(footerPage.description)}" />`)
+      .replace(/<meta property="og:url" content=".*?"\s*\/?>/gi, `<meta property="og:url" content="${escapeHtml(pageCanonical)}" />`)
+      .replace(/<meta property="twitter:title" content=".*?"\s*\/?>/gi, `<meta property="twitter:title" content="${escapeHtml(footerPage.title)}" />`)
+      .replace(/<meta property="twitter:description" content=".*?"\s*\/?>/gi, `<meta property="twitter:description" content="${escapeHtml(footerPage.description)}" />`)
+      .replace(/<link rel="canonical" href=".*?"\s*\/?>/gi, `<link rel="canonical" href="${escapeHtml(pageCanonical)}" />`);
   } else {
     // Intercept /categoria/:id
     const categoryId = pathToCategoryId(cleanPath);

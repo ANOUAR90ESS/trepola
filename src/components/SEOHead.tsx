@@ -12,6 +12,7 @@ interface SEOHeadProps {
   selectedCategory?: string;
   selectedArticle?: Article | null;
   searchQuery?: string;
+  activeFooterPage?: 'terms' | 'privacy' | 'about' | 'cookie' | 'security' | 'contact' | null;
 }
 
 export const SEOHead: React.FC<SEOHeadProps> = ({
@@ -20,6 +21,7 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
   selectedCategory = 'all',
   selectedArticle = null,
   searchQuery = '',
+  activeFooterPage = null,
 }) => {
   useEffect(() => {
     let title = 'Trepola | AI News, Technology, Sports & Local News';
@@ -29,7 +31,48 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
     let canonicalUrl = 'https://www.trepola.com/';
     let jsonLd: any = null;
 
-    if (selectedArticle) {
+    // Keep these in sync with FOOTER_PAGES in server.ts — the server sets the
+    // same values into the HTML, and without this branch the effect would
+    // reset the title/canonical back to the home page's on every footer page.
+    const FOOTER_PAGE_META: Record<string, { title: string; description: string; path: string }> = {
+      about: {
+        title: 'Sobre Trepola | Quiénes somos',
+        description: 'Conoce Trepola: nuestra misión, nuestra visión y cómo cubrimos la actualidad en tecnología, IA, deportes, economía y cultura.',
+        path: '/about',
+      },
+      contact: {
+        title: 'Contacto | Trepola',
+        description: 'Ponte en contacto con el equipo de Trepola para consultas editoriales, correcciones, colaboraciones o cuestiones de publicidad.',
+        path: '/contact',
+      },
+      privacy: {
+        title: 'Política de Privacidad | Trepola',
+        description: 'Cómo Trepola recoge, usa y protege tus datos personales, incluidas cookies, analítica y servicios publicitarios de terceros.',
+        path: '/privacy',
+      },
+      terms: {
+        title: 'Términos de Servicio | Trepola',
+        description: 'Condiciones de uso de Trepola: derechos, responsabilidades, propiedad intelectual y normas de acceso al sitio.',
+        path: '/terms',
+      },
+      cookie: {
+        title: 'Política de Cookies | Trepola',
+        description: 'Qué cookies utiliza Trepola, para qué sirven y cómo puedes gestionarlas o desactivarlas desde tu navegador.',
+        path: '/cookie',
+      },
+      security: {
+        title: 'Seguridad | Trepola',
+        description: 'Medidas de seguridad de Trepola para proteger la información de los usuarios y la integridad del sitio.',
+        path: '/security',
+      },
+    };
+
+    if (activeFooterPage && FOOTER_PAGE_META[activeFooterPage]) {
+      const page = FOOTER_PAGE_META[activeFooterPage];
+      title = page.title;
+      description = page.description;
+      canonicalUrl = `https://www.trepola.com${page.path}`;
+    } else if (selectedArticle) {
       const artTitle = getLocalizedField(selectedArticle.title, language);
       const artExcerpt = getLocalizedField(selectedArticle.excerpt, language);
       
@@ -175,7 +218,7 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
     } else if (schemaScript) {
       schemaScript.remove();
     }
-  }, [language, activeTab, selectedCategory, selectedArticle, searchQuery]);
+  }, [language, activeTab, selectedCategory, selectedArticle, searchQuery, activeFooterPage]);
 
   return null;
 };
