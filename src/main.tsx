@@ -3,15 +3,11 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { AuthProvider } from './lib/auth-context.tsx';
-import { SpeedInsights } from '@vercel/speed-insights/react';
-import { Analytics } from '@vercel/analytics/react';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>
       <App />
     </AuthProvider>
-    <SpeedInsights />
-    <Analytics />
   </StrictMode>,
 );

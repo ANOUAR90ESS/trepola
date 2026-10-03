@@ -1571,19 +1571,21 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'Trepola Local News API' });
 });
 
-// Serve static files from dist if present
+// Serve static files from dist in production
 const distPath = path.join(process.cwd(), 'dist');
-if (fs.existsSync(distPath)) {
+if (process.env.NODE_ENV === 'production' && fs.existsSync(distPath)) {
   app.use(express.static(distPath));
 }
 
+let viteDevServer: any = null;
+
 // Wildcard SSR Handler for Article Meta Tag Injection
-app.get('*', async (req, res, next) => {
+const handleWildcardRoute: express.RequestHandler = async (req, res, next) => {
   if (req.url.startsWith('/api') || req.url.startsWith('/assets') || (req.url.includes('.') && !req.url.endsWith('.html'))) {
     return next();
   }
 
-  const indexPath = fs.existsSync(path.join(distPath, 'index.html'))
+  const indexPath = (process.env.NODE_ENV === 'production' && fs.existsSync(path.join(distPath, 'index.html')))
     ? path.join(distPath, 'index.html')
     : path.join(process.cwd(), 'index.html');
 
@@ -1592,6 +1594,14 @@ app.get('*', async (req, res, next) => {
   }
 
   let html = fs.readFileSync(indexPath, 'utf-8');
+
+  if (viteDevServer) {
+    try {
+      html = await viteDevServer.transformIndexHtml(req.originalUrl, html);
+    } catch (e) {
+      console.error('Vite transformIndexHtml error:', e);
+    }
+  }
   const baseUrl = process.env.VITE_SITE_URL || 'https://www.trepola.com';
 
   // Intercept the footer pages. All six already route client-side (see
@@ -1829,13 +1839,34 @@ app.get('*', async (req, res, next) => {
   }
 
   res.status(200).send(html);
+};
+
+async function startServer() {
+  if (process.env.NODE_ENV !== 'production') {
+    try {
+      const { createServer } = await import('vite');
+      viteDevServer = await createServer({
+        server: { middlewareMode: true },
+        appType: 'custom',
+      });
+      app.use(viteDevServer.middlewares);
+    } catch (e) {
+      console.warn('Vite dev middleware could not be loaded:', e);
+    }
+  }
+
+  app.get('*', handleWildcardRoute);
+
+  if (process.env.VERCEL !== '1') {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server listening on http://0.0.0.0:${PORT}`);
+    });
+  }
+}
+
+startServer().catch(err => {
+  console.error('Failed to start server:', err);
 });
 
 // Export for Vercel Serverless Function
 export default app;
-
-if (process.env.VERCEL !== '1') {
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server listening on http://0.0.0.0:${PORT}`);
-  });
-}
