@@ -65,7 +65,7 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
         {/* Brand & City Badge */}
         <div className="flex items-center gap-3 md:gap-6 min-w-0">
           <button 
-            onClick={() => onChangeTab('feed')}
+            onClick={() => onSelectCategory('all')}
             className="flex flex-col shrink-0"
           >
             <span className="text-xl sm:text-2xl font-black tracking-tighter text-slate-900 dark:text-white leading-none">
@@ -75,12 +75,12 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
           </button>
 
           <div className="flex items-center gap-2 min-w-0">
-            <div className="hidden sm:flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
               <Globe className="w-3.5 h-3.5 text-slate-500" />
               <select 
                 value={language}
                 onChange={(e) => onSelectLanguage(e.target.value as Language)}
-                aria-label="Seleccionar idioma"
+                aria-label={language === 'ar' ? 'اختيار اللغة' : language === 'es' ? 'Seleccionar idioma' : 'Select language'}
                 className="bg-transparent text-xs font-bold text-slate-700 dark:text-slate-300 outline-none cursor-pointer"
               >
                 <option value="es" className="bg-white dark:bg-slate-800">Español</option>
@@ -92,7 +92,10 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
         </div>
 
         {/* Search, Alerts, Theme, Admin */}
-        <div className="flex items-center gap-1.5 sm:gap-3">
+        <div className="flex items-center gap-1 sm:gap-3">
+          <button onClick={() => onChangeTab(activeTab === 'saved' ? 'feed' : 'saved')} aria-label={strings.savedNews} aria-pressed={activeTab === 'saved'} className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200">
+            <Bookmark className="w-4 h-4" />
+          </button>
           <button
             onClick={onOpenSearch}
             aria-label="Buscar noticias"
@@ -164,6 +167,7 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
               <button
                 key={cat.id}
                 onClick={() => onSelectCategory(cat.id)}
+                aria-current={currentCategoryId === cat.id ? 'page' : undefined}
                 className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
                   currentCategoryId === cat.id
                     ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'

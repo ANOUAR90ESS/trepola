@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { X, Send } from 'lucide-react';
-import { Language } from '../i18n/translations';
+import { Language, UI_STRINGS } from '../i18n/translations';
 
 interface FooterPageModalProps {
   pageId: 'terms' | 'privacy' | 'about' | 'cookie' | 'security' | 'contact';
@@ -10,21 +10,6 @@ interface FooterPageModalProps {
 
 export const FooterPageModal: React.FC<FooterPageModalProps> = ({ pageId, language, onClose }) => {
   const isRtl = language === 'ar';
-  
-  const [contactForm, setContactForm] = useState({ name: '', email: '', subject: '', message: '' });
-  const [submitted, setSubmitted] = useState(false);
-
-  const handleContactSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (contactForm.name && contactForm.email && contactForm.message) {
-      setSubmitted(true);
-      setTimeout(() => {
-        setSubmitted(false);
-        setContactForm({ name: '', email: '', subject: '', message: '' });
-        onClose();
-      }, 3000);
-    }
-  };
   
   const renderContent = () => {
     switch (pageId) {
@@ -229,93 +214,35 @@ export const FooterPageModal: React.FC<FooterPageModalProps> = ({ pageId, langua
         );
       case 'contact':
         return (
-          <form onSubmit={handleContactSubmit} className="space-y-4">
-            {submitted ? (
-              <div className="p-4 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 rounded-xl text-center">
-                <p className="text-emerald-700 dark:text-emerald-400 font-bold">Message sent successfully!</p>
-                <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-1">We will get back to you shortly.</p>
-              </div>
-            ) : (
-              <>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={contactForm.name}
-                    onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-sm text-slate-900 dark:text-white focus:outline-hidden focus:border-rose-500"
-                    placeholder="Your Name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Email</label>
-                  <input
-                    type="email"
-                    required
-                    value={contactForm.email}
-                    onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-sm text-slate-900 dark:text-white focus:outline-hidden focus:border-rose-500"
-                    placeholder="you@example.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Subject</label>
-                  <input
-                    type="text"
-                    value={contactForm.subject}
-                    onChange={(e) => setContactForm({ ...contactForm, subject: e.target.value })}
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-sm text-slate-900 dark:text-white focus:outline-hidden focus:border-rose-500"
-                    placeholder="How can we help?"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Message</label>
-                  <textarea
-                    required
-                    rows={4}
-                    value={contactForm.message}
-                    onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-sm text-slate-900 dark:text-white focus:outline-hidden focus:border-rose-500 resize-none"
-                    placeholder="Write your message here..."
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
-                >
-                  <Send className="w-4 h-4" />
-                  Send Message
-                </button>
-              </>
-            )}
-          </form>
+          <div className="space-y-4">
+            <p className="text-slate-700 dark:text-slate-300">
+              {language === 'ar' ? 'للتواصل مع هيئة التحرير، افتح تطبيق البريد الإلكتروني باستخدام الرابط أدناه. لا تُرسل أي رسالة من هذه الصفحة تلقائيًا.' : language === 'es' ? 'Contacta con la redacción desde tu aplicación de correo. Esta página no envía mensajes automáticamente.' : 'Contact the editorial team using your email app. This page does not send messages automatically.'}
+            </p>
+            <a href="mailto:contact@trepola.com" className="inline-flex items-center gap-2 text-rose-600 dark:text-rose-400 font-bold underline" dir="ltr">
+              <Send className="w-4 h-4" /> contact@trepola.com
+            </a>
+          </div>
         );
       default:
         return null;
     }
   };
 
-  const getTitle = () => {
-    switch (pageId) {
-      case 'about': return 'About Trepola';
-      case 'privacy': return 'Privacy Policy';
-      case 'terms': return 'Terms of Service';
-      case 'cookie': return 'Cookie Policy';
-      case 'security': return 'Security';
-      case 'contact': return 'Contact Us';
-      default: return '';
-    }
+  const titles = {
+    es: { about: 'Acerca de Trepola', privacy: 'Política de privacidad', terms: 'Términos de servicio', cookie: 'Política de cookies', security: 'Seguridad', contact: 'Contacto' },
+    en: { about: 'About Trepola', privacy: 'Privacy Policy', terms: 'Terms of Service', cookie: 'Cookie Policy', security: 'Security', contact: 'Contact Us' },
+    ar: { about: 'عن المنصة', privacy: 'سياسة الخصوصية', terms: 'شروط الاستخدام', cookie: 'سياسة ملفات الارتباط', security: 'الأمان', contact: 'اتصل بنا' },
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in" dir={isRtl ? 'rtl' : 'ltr'}>
+    <div role="dialog" aria-modal="true" aria-label={titles[language][pageId]} onKeyDown={(event) => { if (event.key === 'Escape') onClose(); }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden border border-slate-200 dark:border-slate-700">
         <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-900/50">
           <h2 className="text-lg font-black text-slate-900 dark:text-white">
-            {getTitle()}
+            {titles[language][pageId]}
           </h2>
           <button
+            aria-label={UI_STRINGS[language].close}
             onClick={onClose}
             className="p-2 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950 dark:hover:text-red-400 transition-colors"
           >
@@ -323,7 +250,8 @@ export const FooterPageModal: React.FC<FooterPageModalProps> = ({ pageId, langua
           </button>
         </div>
         <div className="p-6 max-h-[70vh] overflow-y-auto">
-          <div className="prose dark:prose-invert max-w-none text-sm leading-relaxed">
+          <div lang={pageId === 'contact' ? language : 'en'} dir={pageId === 'contact' && isRtl ? 'rtl' : 'ltr'} className="prose dark:prose-invert max-w-none text-sm leading-relaxed">
+            {pageId !== 'contact' && language !== 'en' && <p className="mb-4 text-slate-500" dir={isRtl ? 'rtl' : 'ltr'}>{isRtl ? 'هذا المحتوى متاح حاليًا باللغة الإنجليزية.' : 'Este contenido está disponible actualmente en inglés.'}</p>}
             {renderContent()}
           </div>
         </div>

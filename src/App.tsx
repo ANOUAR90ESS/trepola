@@ -11,7 +11,7 @@ import { PrivacyCookieBanner } from './components/PrivacyCookieBanner';
 // Lazy Loaded Modals for Mobile Bundle Splitting & Zero Main-Thread Blocking
 const ArticleDetailModal = React.lazy(() => import('./components/ArticleDetailModal').then(m => ({ default: m.ArticleDetailModal })));
 const SmartSearchModal = React.lazy(() => import('./components/SmartSearchModal').then(m => ({ default: m.SmartSearchModal })));
-const BookmarksDrawer = React.lazy(() => import('./components/BookmarksDrawer').then(m => ({ default: m.BookmarksDrawer })));
+const UrgentAlertsBar = React.lazy(() => import('./components/UrgentAlertsBar').then(m => ({ default: m.UrgentAlertsBar })));
 const AdminDashboard = React.lazy(() => import('./components/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 const SEOViewerModal = React.lazy(() => import('./components/SEOViewerModal').then(m => ({ default: m.SEOViewerModal })));
 const FooterPageModal = React.lazy(() => import('./components/FooterPageModal').then(m => ({ default: m.FooterPageModal })));
@@ -74,7 +74,7 @@ export default function App() {
 
   const [savedArticleIds, setSavedArticleIds] = useState<string[]>(() => {
     const saved = localStorage.getItem('nabd_saved_ids');
-    return saved ? JSON.parse(saved) : ['art-1'];
+    try { return saved && Array.isArray(JSON.parse(saved)) ? JSON.parse(saved) : []; } catch { return []; }
   });
 
     const { user, token } = useAuth();
@@ -160,6 +160,22 @@ export default function App() {
     }
   };
 
+  const handleOpenFooterPage = (page: NonNullable<typeof activeFooterPage>) => {
+    setSelectedArticle(null);
+    setActiveFooterPage(page);
+    window.history.pushState({}, '', `/${page}`);
+  };
+
+  const handleCloseFooterPage = () => {
+    setActiveFooterPage(null);
+    window.history.pushState({}, '', categoryIdToPath(selectedCategory));
+  };
+
+  useEffect(() => {
+    document.documentElement.lang = language;
+    document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+  }, [language]);
+
   // Synchronize article or page on initial load or popstate (e.g. /news/:slug, /terms, /privacy)
   useEffect(() => {
     const parseUrlRoute = () => {
@@ -167,7 +183,9 @@ export default function App() {
       const pathname = window.location.pathname.toLowerCase();
 
       // Check footer pages (e.g. /terms, /privacy)
-      const pageMatch = pathname.match(/^\/(terms|privacy|about|cookie|security|contact)/);
+      setSelectedArticle(null);
+      setActiveFooterPage(null);
+      const pageMatch = pathname.match(/^\/(terms|privacy|about|cookie|security|contact)\/?$/);
       if (pageMatch) {
         setActiveFooterPage(pageMatch[1] as any);
         return;
@@ -176,9 +194,10 @@ export default function App() {
       // Check news articles
       const match = pathname.match(/^\/news\/([^\/]+)/);
       if (match) {
-        const slugOrId = decodeURIComponent(match[1]).trim();
+        let slugOrId: string;
+        try { slugOrId = decodeURIComponent(match[1]).trim(); } catch { return; }
         const found = articles.find(
-          (a) => a.id === slugOrId || a.slug === slugOrId || slugify(getLocalizedField(a.title, 'es')) === slugOrId
+          (a) => a.id === slugOrId || a.slug === slugOrId || (['es', 'en', 'ar'] as const).some(lang => getArticleSlug(a, lang) === slugOrId || slugify(getLocalizedField(a.title, lang)) === slugOrId)
         );
         if (found) {
           setSelectedArticle(found);
@@ -249,7 +268,10 @@ export default function App() {
   // Handlers
   
   const handleToggleBookmark = async (id: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     
     const isCurrentlySaved = savedArticleIds.includes(id);
     // Optimistic UI
@@ -281,7 +303,7 @@ export default function App() {
   };
 
   
-  const handleAddComment = async (articleId: string, text: string, name: string, isResident: boolean) => {
+  const handleAddComment = async (articleId: string, text: string, isResident: boolean) => {
     if (user && token) {
       try {
         await fetch('/api/comments', {
@@ -440,7 +462,8 @@ export default function App() {
         onOpenSearch={() => setIsOpenSearch(true)}
         darkMode={darkMode}
         onToggleDarkMode={() => setDarkMode(!darkMode)}
-        isAdminAuthenticated={isAdminAuthenticated}
+        urgentAlertsCount={alerts.filter(alert => alert.active).length}
+        onOpenAlerts={() => setIsOpenAlerts(true)}
       />
 
       {/* Main Container */}
@@ -581,7 +604,8 @@ export default function App() {
                 language={language}
                 articles={articles}
                 onSelectArticle={handleOpenArticle}
-                selectedCityId={selectedCityId}
+                events={events}
+                selectedDistrictId={selectedDistrictId}
               />
             </Suspense>
           </div>
@@ -592,7 +616,7 @@ export default function App() {
           <div className="animate-fade-in space-y-6">
             <div className="p-5 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-black text-slate-900 dark:text-white">{strings.savedArticlesTitle}</h2>
+                <h2 className="text-xl font-black text-slate-900 dark:text-white">{strings.savedNews}</h2>
               </div>
               <span className="bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 text-xs font-bold px-3 py-1 rounded-full">
                 {savedArticles.length}
@@ -604,13 +628,13 @@ export default function App() {
                 <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700">
                   <Newspaper className="w-12 h-12 mx-auto mb-2 text-slate-400 opacity-50" />
                   <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
-                    {strings.noSavedArticles}
+                    {strings.noSavedNews}
                   </p>
                   <button
                     onClick={() => setActiveTab('feed')}
                     className="mt-3 text-xs bg-rose-600 text-white font-bold px-4 py-2 rounded-xl"
                   >
-                    {strings.latestLocalNews}
+                    {strings.startExploring}
                   </button>
                 </div>
 
@@ -683,26 +707,28 @@ export default function App() {
         language={language}
         selectedCityId={selectedCityId}
         onOpenAlerts={() => setIsOpenAlerts(true)}
-        onOpenPage={setActiveFooterPage}
+        onOpenPage={handleOpenFooterPage}
+        onSelectCategory={handleSelectCategory}
         onOpenAdminLogin={() => setShowAdminLoginModal(true)}
       />
 
       {/* Modal overlays */}
       <PrivacyCookieBanner 
         language={language}
-        onOpenPrivacyPage={() => setActiveFooterPage('privacy')}
+        onOpenPrivacyPage={() => handleOpenFooterPage('privacy')}
       />
       <Suspense fallback={null}>
         {activeFooterPage && (
           <FooterPageModal
             pageId={activeFooterPage}
             language={language}
-            onClose={() => setActiveFooterPage(null)}
+            onClose={handleCloseFooterPage}
           />
         )}
 
         {selectedArticle && (
           <ArticleDetailModal
+            key={selectedArticle.id}
             language={language}
             article={selectedArticle}
             onClose={handleCloseArticle}
@@ -732,15 +758,8 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'saved' && (
-          <BookmarksDrawer
-            language={language}
-            savedArticles={savedArticles}
-            onClose={() => setActiveTab('feed')}
-            onSelectArticle={(art) => handleOpenArticle(art)}
-            onRemoveBookmark={handleToggleBookmark}
-            onClearAll={() => setSavedArticleIds([])}
-          />
+        {isOpenAlerts && (
+          <UrgentAlertsBar language={language} alerts={alerts} isOpenDrawer={true} onCloseDrawer={() => setIsOpenAlerts(false)} />
         )}
         {showAdminLoginModal && (
           <AdminLoginModal 

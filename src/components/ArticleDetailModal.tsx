@@ -82,6 +82,10 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => () => {
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  }, []);
+
   // Handle Reading Progress Percentage
   const handleScroll = () => {
     if (!scrollRef.current) return;
@@ -587,7 +591,7 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
                 <textarea
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
-                  placeholder={strings.writeCommentPlaceholder}
+                  placeholder={strings.addCommentPlaceholder}
                   className="w-full p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-rose-500 transition-all resize-none h-24"
                   required
                 />
@@ -599,7 +603,7 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
                       onChange={(e) => setIsResident(e.target.checked)}
                       className="rounded text-rose-600 focus:ring-rose-500"
                     />
-                    <span>{strings.neighborhoodResidentBadge}</span>
+                    <span>{strings.residentCheck}</span>
                   </label>
 
                   <button
@@ -607,7 +611,7 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
                     className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-md"
                   >
                     <Send className="w-3.5 h-3.5" />
-                    <span>{strings.postComment}</span>
+                    <span>{strings.publishComment}</span>
                   </button>
                 </div>
               </form>

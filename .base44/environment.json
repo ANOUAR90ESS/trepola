@@ -1,0 +1,16 @@
+{
+  "previewPort": 3000,
+  "healthPath": "/api/health",
+  "startCommand": "docker compose -f docker-compose.base44.yml up -d --build",
+  "secrets": [
+    { "name": "ADMIN_EMAIL", "description": "Administrator email configured by the app owner", "requiredAtBoot": false },
+    { "name": "ADMIN_PASSWORD", "description": "Administrator password configured by the app owner", "requiredAtBoot": false },
+    { "name": "ADMIN_JWT_SECRET", "description": "Strong signing secret for administrator sessions", "requiredAtBoot": false },
+    { "name": "ANTHROPIC_API_KEY", "description": "Anthropic Console API key for editorial article and interactive guide generation", "requiredAtBoot": false },
+    { "name": "OPENAI_API_KEY", "description": "OpenAI API key for legacy generation and images", "requiredAtBoot": false },
+    { "name": "GEMINI_API_KEY", "description": "Google AI Studio API key for legacy generation", "requiredAtBoot": false },
+    { "name": "VITE_SUPABASE_URL", "description": "Supabase project URL for optional article synchronization and storage", "requiredAtBoot": false },
+    { "name": "VITE_SUPABASE_ANON_KEY", "description": "Supabase project public anonymous key", "requiredAtBoot": false },
+    { "name": "SUPABASE_SERVICE_ROLE_KEY", "description": "Supabase server-only service role key for editorial image storage", "requiredAtBoot": false }
+  ]
+}

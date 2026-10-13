@@ -84,6 +84,7 @@ export const UrgentAlertsBar: React.FC<UrgentAlertsBarProps> = ({
                   {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
                 </button>
                 <button
+                  aria-label={strings.close}
                   onClick={onCloseDrawer}
                   className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors"
                 >
@@ -94,13 +95,13 @@ export const UrgentAlertsBar: React.FC<UrgentAlertsBarProps> = ({
 
             {/* List of Alerts */}
             <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
-              {alerts.length === 0 ? (
+              {activeAlerts.length === 0 ? (
                 <div className="text-center py-12 text-slate-400">
                   <Bell className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">{strings.noArticlesFound}</p>
+                  <p className="text-sm">{strings.noAlerts}</p>
                 </div>
               ) : (
-                alerts.map((alert) => {
+                activeAlerts.map((alert) => {
                   const title = getLocalizedField(alert.title, language);
                   const summary = getLocalizedField(alert.summary, language);
                   return (

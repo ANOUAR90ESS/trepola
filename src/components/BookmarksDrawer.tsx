@@ -33,7 +33,7 @@ export const BookmarksDrawer: React.FC<BookmarksDrawerProps> = ({
               <Bookmark className="w-5 h-5 fill-rose-500" />
             </div>
             <div>
-              <h3 className="font-bold text-slate-900 dark:text-white text-base">{strings.savedArticlesTitle}</h3>
+              <h3 className="font-bold text-slate-900 dark:text-white text-base">{strings.savedNews}</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">({savedArticles.length})</p>
             </div>
           </div>
@@ -51,7 +51,7 @@ export const BookmarksDrawer: React.FC<BookmarksDrawerProps> = ({
           {savedArticles.length === 0 ? (
             <div className="text-center py-16 text-slate-400">
               <Newspaper className="w-12 h-12 mx-auto mb-2 opacity-40" />
-              <p className="text-sm font-bold">{strings.noSavedArticles}</p>
+              <p className="text-sm font-bold">{strings.noSavedNews}</p>
             </div>
           ) : (
             savedArticles.map((art) => {

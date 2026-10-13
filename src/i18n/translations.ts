@@ -115,7 +115,7 @@ export const CITIES_DATA: CityData[] = [
 
 export const CATEGORIES_LIST = [
   { id: 'all', name: { es: 'Todos', en: 'All', ar: 'الكل' } },
-  { id: 'general', name: { es: 'Noticias General', en: 'General News', ar: 'أخبار عامة' } },
+  { id: 'general', name: { es: 'Noticias Generales', en: 'General News', ar: 'أخبار عامة' } },
   { id: 'tech', name: { es: 'Tecnología', en: 'Technology', ar: 'تكنولوجيا وابتكار' } },
   { id: 'sports', name: { es: 'Deportes', en: 'Sports', ar: 'رياضة' } },
   { id: 'politics', name: { es: 'Política', en: 'Politics', ar: 'سياسة وأحداث' } },
@@ -125,6 +125,12 @@ export const CATEGORIES_LIST = [
 
 export const UI_STRINGS = {
   es: {
+    emergencyDetails: 'Ver detalles',
+    emergencyBannerTitle: 'Alertas',
+    spainEmergencies: 'Información de emergencias',
+    noAlerts: 'No hay alertas activas.',
+    close: 'Cerrar',
+    emergencyPhones: [{ name: 'Emergencias / Emergency / الطوارئ', phone: '112' }],
     appName: 'Trepola',
     tagline: 'Portal de noticias internacionales, tecnología, deportes y política',
     badgeText: 'Cobertura 24/7',
@@ -200,6 +206,12 @@ export const UI_STRINGS = {
   },
 
   en: {
+    emergencyDetails: 'View details',
+    emergencyBannerTitle: 'Alerts',
+    spainEmergencies: 'Emergency information',
+    noAlerts: 'No active alerts.',
+    close: 'Close',
+    emergencyPhones: [{ name: 'Emergencias / Emergency / الطوارئ', phone: '112' }],
     appName: 'Trepola',
     tagline: 'Global portal for technology, sports, politics, and general news',
     badgeText: '24/7 Coverage',
@@ -275,6 +287,12 @@ export const UI_STRINGS = {
   },
 
   ar: {
+    emergencyDetails: 'عرض التفاصيل',
+    emergencyBannerTitle: 'التنبيهات',
+    spainEmergencies: 'معلومات الطوارئ',
+    noAlerts: 'لا توجد تنبيهات نشطة.',
+    close: 'إغلاق',
+    emergencyPhones: [{ name: 'Emergencias / Emergency / الطوارئ', phone: '112' }],
     // Brand name stays "Trepola" in every language — translating it would give
     // Google two different brand names for one domain, which is exactly what
     // weakens the name↔site association we're trying to build.

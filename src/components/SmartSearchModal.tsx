@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Search, X, Sparkles, Newspaper, ChevronRight } from 'lucide-react';
 import { Article } from '../types';
-import { Language, UI_STRINGS } from '../i18n/translations';
+import { Language, UI_STRINGS, CATEGORIES_LIST } from '../i18n/translations';
 import { getLocalizedField } from '../utils/i18nHelpers';
 
 interface SmartSearchModalProps {
@@ -24,13 +24,13 @@ export const SmartSearchModal: React.FC<SmartSearchModalProps> = ({
     const title = getLocalizedField(art.title, language).toLowerCase();
     const excerpt = getLocalizedField(art.excerpt, language).toLowerCase();
     const content = getLocalizedField(art.content, language).toLowerCase();
-    const query = searchTerm.toLowerCase();
+    const query = searchTerm.trim().toLowerCase();
 
     return title.includes(query) || excerpt.includes(query) || content.includes(query);
   });
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs flex justify-center p-3 sm:p-6 animate-fade-in">
+    <div role="dialog" aria-modal="true" aria-label={strings.searchPlaceholder} onKeyDown={(event) => { if (event.key === 'Escape') onClose(); }} className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs flex justify-center p-3 sm:p-6 animate-fade-in">
       <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 my-auto relative flex flex-col max-h-[85vh]">
         {/* Top Search Input Header */}
         <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-3 bg-slate-50 dark:bg-slate-800/50">
@@ -38,12 +38,14 @@ export const SmartSearchModal: React.FC<SmartSearchModalProps> = ({
           <input
             type="text"
             autoFocus
+            aria-label={strings.searchPlaceholder}
             placeholder={strings.searchPlaceholder}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-transparent text-sm sm:text-base font-bold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden"
           />
           <button
+            aria-label={strings.close}
             onClick={onClose}
             className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white"
           >
@@ -63,13 +65,13 @@ export const SmartSearchModal: React.FC<SmartSearchModalProps> = ({
               const title = getLocalizedField(art.title, language);
               const excerpt = getLocalizedField(art.excerpt, language);
               return (
-                <div
+                <button type="button"
                   key={art.id}
                   onClick={() => {
                     onSelectArticle(art);
                     onClose();
                   }}
-                  className="group p-3 rounded-2xl bg-slate-50 hover:bg-rose-50/50 dark:bg-slate-800/60 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 transition-all cursor-pointer flex items-center gap-3.5"
+                  className="group w-full text-start p-3 rounded-2xl bg-slate-50 hover:bg-rose-50/50 dark:bg-slate-800/60 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 transition-all cursor-pointer flex items-center gap-3.5"
                 >
                   <img
                     src={art.imageUrl}
@@ -79,7 +81,7 @@ export const SmartSearchModal: React.FC<SmartSearchModalProps> = ({
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 text-[10px] font-bold text-rose-600 dark:text-rose-400 mb-1">
-                      <span>{art.category}</span>
+                      <span>{CATEGORIES_LIST.find(category => category.id === art.category)?.name[language] || art.category}</span>
                     </div>
                     <h4 className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm line-clamp-2 leading-snug group-hover:text-rose-600 transition-colors">
                       {title}
@@ -87,7 +89,7 @@ export const SmartSearchModal: React.FC<SmartSearchModalProps> = ({
                     <p className="text-[11px] text-slate-500 line-clamp-1 mt-1">{excerpt}</p>
                   </div>
                   <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-rose-600 shrink-0" />
-                </div>
+                </button>
               );
             })
           )}

@@ -76,10 +76,10 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#039;');
 }
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://pneiftfkllsvlwtgzccx.supabase.co';
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBuZWlmdGZrbGxzdmx3dGd6Y2N4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0NzAwMjksImV4cCI6MjEwMDA0NjAyOX0.LlJsdTpQhi1ADCI_DcCxV26dkZiPeZDQjUP9tkgNKWg';
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
 
-const supabaseClient = createClient(supabaseUrl, supabaseKey);
+const supabaseClient = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 async function getArticleBySlugOrId(identifier: string) {
   if (!identifier) return null;

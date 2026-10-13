@@ -83,7 +83,7 @@ export const INITIAL_ARTICLES: Article[] = [
     slug: 'gran-noche-de-champions-duelo-epico-entre-gigantes-europeos',
     cityId: 'madrid',
     title: {
-      ar: 'قمة دوري الأبطال: مواجهة ملحمية بين كبار القرة في ليلة كروية خيالية',
+      ar: 'قمة دوري الأبطال: مواجهة ملحمية بين كبار القارة في ليلة كروية خيالية',
       es: 'Gran Noche de Champions: Duelo épico entre los gigantes europeos',
       en: 'Champions League Showdown: Epic Clash Between European Football Giants'
     },

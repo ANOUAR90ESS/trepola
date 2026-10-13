@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Radio, Mail, Shield, Globe2, FileText, CheckCircle2, ArrowRight, ArrowLeft, Send, Lock } from 'lucide-react';
+import { categoryIdToPath } from '../utils/categoryRoutes';
 import { useAuth } from '../lib/auth-context.tsx';
 import { Language, UI_STRINGS, CITIES_DATA, CATEGORIES_LIST } from '../i18n/translations';
 
@@ -7,27 +8,16 @@ interface FooterProps {
   language: Language;
   selectedCityId: string;
   onOpenAlerts: () => void;
+  onSelectCategory: (category: string) => void;
   onOpenPage?: (pageId: 'terms' | 'privacy' | 'about' | 'cookie' | 'security' | 'contact') => void;
   onOpenAdminLogin?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = React.memo(({ language, selectedCityId, onOpenPage, onOpenAdminLogin }) => {
+export const Footer: React.FC<FooterProps> = React.memo(({ language, selectedCityId, onOpenPage, onOpenAdminLogin, onSelectCategory }) => {
   const strings = UI_STRINGS[language] || UI_STRINGS.es;
   const currentCity = CITIES_DATA.find((c) => c.id === selectedCityId) || CITIES_DATA[0];
-  const [email, setEmail] = useState('');
-  const [subscribed, setSubscribed] = useState(false);
-
   const isRtl = language === 'ar';
-  const { signIn, user } = useAuth();
-
-  const handleSubscribe = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email.trim()) {
-      setSubscribed(true);
-      setTimeout(() => setSubscribed(false), 4000);
-      setEmail('');
-    }
-  };
+  const { user } = useAuth();
 
   return (
     <footer className="mt-20 bg-slate-950 text-slate-300 border-t border-slate-800/80 transition-colors">
@@ -48,25 +38,9 @@ export const Footer: React.FC<FooterProps> = React.memo(({ language, selectedCit
             </p>
           </div>
 
-          <form onSubmit={handleSubscribe} className="flex items-center gap-2 w-full md:w-auto max-w-md">
-            <div className="relative flex-1">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={isRtl ? 'أدخل بريدك الإلكتروني...' : language === 'es' ? 'Tu correo electrónico...' : 'Enter your email...'}
-                className="w-full bg-slate-900 border border-slate-700 focus:border-rose-500 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-500 focus:outline-hidden transition-all"
-                required
-              />
-            </div>
-            <button
-              type="submit"
-              className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-colors flex items-center gap-1.5 shrink-0 shadow-md"
-            >
-              <span>{subscribed ? (isRtl ? 'تم الاشتراك!' : '¡Suscrito!') : (isRtl ? 'اشترك الآن' : language === 'es' ? 'Suscribirse' : 'Subscribe')}</span>
-              {isRtl ? <ArrowLeft className="w-3.5 h-3.5" /> : <ArrowRight className="w-3.5 h-3.5" />}
-            </button>
-          </form>
+          <p role="status" className="text-sm text-slate-300 text-center">
+            {isRtl ? 'الاشتراك غير متاح حاليًا؛ خدمة البريد لم تُربط بعد.' : language === 'es' ? 'Suscripción no disponible: el servicio de correo aún no está conectado.' : 'Subscriptions are unavailable until the email service is connected.'}
+          </p>
         </div>
       </div>
 
@@ -115,7 +89,13 @@ export const Footer: React.FC<FooterProps> = React.memo(({ language, selectedCit
               {CATEGORIES_LIST.filter(c => c.id !== 'all').map((cat) => (
                 <li key={cat.id}>
                   <a
-                    href={`#cat-${cat.id}`}
+                    href={categoryIdToPath(cat.id)}
+                    onClick={(event) => {
+                      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                      event.preventDefault();
+                      onSelectCategory(cat.id);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
                     className="hover:text-white transition-colors flex items-center justify-between group"
                   >
                     <span>{cat.name[language]}</span>
@@ -146,24 +126,24 @@ export const Footer: React.FC<FooterProps> = React.memo(({ language, selectedCit
 
             <div className="space-y-2 text-xs font-medium text-slate-400 pt-1">
               <div className="grid grid-cols-2 gap-y-2 text-[11px]">
-                <span onClick={() => onOpenPage?.('about')} className="hover:text-white cursor-pointer transition-colors">
+                <button type="button" onClick={() => onOpenPage?.('about')} className="hover:text-white cursor-pointer transition-colors">
                   {language === 'es' ? 'Acerca de Trepola' : language === 'ar' ? 'عن المنصة' : 'About Trepola'}
-                </span>
-                <span onClick={() => onOpenPage?.('privacy')} className="hover:text-white cursor-pointer transition-colors text-right rtl:text-left">
+                </button>
+                <button type="button" onClick={() => onOpenPage?.('privacy')} className="hover:text-white cursor-pointer transition-colors text-right rtl:text-left">
                   {language === 'es' ? 'Privacidad' : language === 'ar' ? 'الخصوصية' : 'Privacy Policy'}
-                </span>
-                <span onClick={() => onOpenPage?.('terms')} className="hover:text-white cursor-pointer transition-colors">
+                </button>
+                <button type="button" onClick={() => onOpenPage?.('terms')} className="hover:text-white cursor-pointer transition-colors">
                   {language === 'es' ? 'Términos' : language === 'ar' ? 'الشروط' : 'Terms of Service'}
-                </span>
-                <span onClick={() => onOpenPage?.('cookie')} className="hover:text-white cursor-pointer transition-colors text-right rtl:text-left">
+                </button>
+                <button type="button" onClick={() => onOpenPage?.('cookie')} className="hover:text-white cursor-pointer transition-colors text-right rtl:text-left">
                   {language === 'es' ? 'Cookies' : language === 'ar' ? 'ملفات الارتباط' : 'Cookie Policy'}
-                </span>
-                <span onClick={() => onOpenPage?.('security')} className="hover:text-white cursor-pointer transition-colors">
+                </button>
+                <button type="button" onClick={() => onOpenPage?.('security')} className="hover:text-white cursor-pointer transition-colors">
                   {language === 'es' ? 'Seguridad' : language === 'ar' ? 'الأمان' : 'Security'}
-                </span>
-                <span onClick={() => onOpenPage?.('contact')} className="hover:text-white cursor-pointer transition-colors text-right rtl:text-left">
+                </button>
+                <button type="button" onClick={() => onOpenPage?.('contact')} className="hover:text-white cursor-pointer transition-colors text-right rtl:text-left">
                   {language === 'es' ? 'Contacto' : language === 'ar' ? 'اتصل بنا' : 'Contact Us'}
-                </span>
+                </button>
               </div>
             </div>
           </div>
@@ -180,9 +160,7 @@ export const Footer: React.FC<FooterProps> = React.memo(({ language, selectedCit
           </div>
 
           <div className="flex items-center gap-3 text-[11px] text-slate-400 font-mono">
-            <span>ISO 9001 Journalism Standard</span>
-            <span>•</span>
-            <span>SSL Encrypted</span>
+            <span>Trepola</span>
             {!user && (
               <button 
                 onClick={onOpenAdminLogin} 
